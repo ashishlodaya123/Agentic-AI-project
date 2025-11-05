@@ -1,0 +1,37 @@
+#-*- mode: git-ignore; -*-
+# Ignore Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ignore virtual environments
+.venv
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Ignore package installer artifacts
+.eggs/
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Ignore sensitive files
+.env
+*.db
+*.pkl
+
+# Ignore temporary files
+*.log
+*.swp
+*.swo
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore ChromaDB data
+chroma_data/

@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+celery
+redis
+langchain
+langgraph
+chromadb
+sentence-transformers
+torch
+torchvision
+prometheus-client
+pydantic
+requests
+python-dotenv
+scikit-learn
