@@ -1,0 +1,315 @@
+import logging
+from typing import Dict, List, Any
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+class DifferentialDiagnosisAgent:
+    """
+    Agent for generating differential diagnoses based on symptoms and vitals.
+    """
+    
+    def __init__(self):
+        # Medical condition database with symptoms and prevalence
+        self.condition_database = {
+            "myocardial_infarction": {
+                "name": "Myocardial Infarction (Heart Attack)",
+                "symptoms": ["chest pain", "shortness of breath", "nausea", "sweating", "arm pain"],
+                "vital_indicators": {"high_blood_pressure": True, "rapid_heart_rate": True},
+                "prevalence": 0.8,
+                "severity": "high"
+            },
+            "pneumonia": {
+                "name": "Pneumonia",
+                "symptoms": ["fever", "cough", "shortness of breath", "chest pain", "fatigue"],
+                "vital_indicators": {"fever": True, "rapid_breathing": True},
+                "prevalence": 0.7,
+                "severity": "high"
+            },
+            "pulmonary_embolism": {
+                "name": "Pulmonary Embolism",
+                "symptoms": ["shortness of breath", "chest pain", "cough", "leg swelling"],
+                "vital_indicators": {"rapid_heart_rate": True, "low_oxygen": True},
+                "prevalence": 0.6,
+                "severity": "high"
+            },
+            "asthma_exacerbation": {
+                "name": "Asthma Exacerbation",
+                "symptoms": ["shortness of breath", "wheezing", "chest tightness", "cough"],
+                "vital_indicators": {"rapid_breathing": True, "low_oxygen": True},
+                "prevalence": 0.65,
+                "severity": "moderate"
+            },
+            "costochondritis": {
+                "name": "Costochondritis",
+                "symptoms": ["chest pain", "tenderness", "pain with breathing"],
+                "vital_indicators": {},
+                "prevalence": 0.5,
+                "severity": "low"
+            },
+            "gastroesophageal_reflux": {
+                "name": "Gastroesophageal Reflux Disease (GERD)",
+                "symptoms": ["chest pain", "heartburn", "acid reflux", "regurgitation"],
+                "vital_indicators": {},
+                "prevalence": 0.7,
+                "severity": "low"
+            },
+            "anxiety_panic_attack": {
+                "name": "Anxiety/Panic Attack",
+                "symptoms": ["chest pain", "shortness of breath", "sweating", "dizziness", "palpitations"],
+                "vital_indicators": {"rapid_heart_rate": True},
+                "prevalence": 0.6,
+                "severity": "low"
+            },
+            "hypertensive_crisis": {
+                "name": "Hypertensive Crisis",
+                "symptoms": ["headache", "chest pain", "shortness of breath", "blurred vision"],
+                "vital_indicators": {"high_blood_pressure": True},
+                "prevalence": 0.55,
+                "severity": "high"
+            }
+        }
+    
+    def run(self, patient_data: dict, symptoms_analysis: dict, risk_assessment: dict) -> Dict[str, Any]:
+        """
+        Generate a differential diagnosis based on patient data.
+        
+        Args:
+            patient_data: Patient information including age, gender, medical history
+            symptoms_analysis: Analysis of symptoms and vitals
+            risk_assessment: Risk stratification results
+            
+        Returns:
+            Dict containing differential diagnosis with ranked possibilities
+        """
+        try:
+            logger.info("Generating differential diagnosis")
+            
+            # Extract relevant information
+            symptoms = patient_data.get("chief_complaint", "").lower()
+            vitals = patient_data.get("vital_signs", {})
+            age = patient_data.get("age", 0)
+            gender = patient_data.get("gender", "")
+            medical_history = patient_data.get("medical_history", [])
+            
+            # Generate differential diagnosis
+            diagnosis_list = self._generate_diagnoses(symptoms, vitals, age, gender, medical_history)
+            
+            # Rank diagnoses based on match score
+            ranked_diagnoses = sorted(diagnosis_list, key=lambda x: x["match_score"], reverse=True)
+            
+            # Add confidence scores
+            for i, diagnosis in enumerate(ranked_diagnoses):
+                diagnosis["confidence_score"] = max(0.9 - (i * 0.1), 0.3)  # Decreasing confidence
+            
+            result = {
+                "differential_diagnosis": ranked_diagnoses,
+                "total_possibilities": len(ranked_diagnoses),
+                "timestamp": datetime.now().isoformat(),
+                "confidence_factors": {
+                    "symptom_match": True,
+                    "vital_signs": bool(vitals),
+                    "risk_assessment": bool(risk_assessment)
+                }
+            }
+            
+            logger.info(f"Generated {len(ranked_diagnoses)} differential diagnoses")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in differential diagnosis generation: {e}")
+            return {
+                "differential_diagnosis": [],
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
+            }
+    
+    def _generate_diagnoses(self, symptoms: str, vitals: dict, age: int, gender: str, medical_history: List[str]) -> List[Dict[str, Any]]:
+        """Generate and rank possible diagnoses."""
+        diagnoses = []
+        
+        # Check each condition in the database
+        for condition_key, condition_data in self.condition_database.items():
+            match_score = 0
+            matched_symptoms = []
+            matched_vitals = []
+            
+            # Check symptom matches
+            condition_symptoms = condition_data["symptoms"]
+            for symptom in condition_symptoms:
+                if symptom in symptoms:
+                    match_score += 1
+                    matched_symptoms.append(symptom)
+            
+            # Check vital sign indicators
+            vital_indicators = condition_data["vital_indicators"]
+            for indicator, required in vital_indicators.items():
+                if required and self._check_vital_indicator(indicator, vitals):
+                    match_score += 0.5
+                    matched_vitals.append(indicator)
+            
+            # Adjust for age and gender factors
+            match_score = self._adjust_for_demographics(match_score, condition_key, age, gender)
+            
+            # Adjust for medical history
+            match_score = self._adjust_for_medical_history(match_score, condition_key, medical_history)
+            
+            # Only include conditions with some match
+            if match_score > 0:
+                diagnoses.append({
+                    "condition": condition_data["name"],
+                    "condition_key": condition_key,
+                    "match_score": match_score,
+                    "matched_symptoms": matched_symptoms,
+                    "matched_vitals": matched_vitals,
+                    "severity": condition_data["severity"],
+                    "prevalence": condition_data["prevalence"],
+                    "recommendations": self._get_recommendations(condition_key)
+                })
+        
+        return diagnoses
+    
+    def _check_vital_indicator(self, indicator: str, vitals: dict) -> bool:
+        """Check if a vital sign indicator is present."""
+        if indicator == "fever":
+            temp = vitals.get("temperature")
+            if temp:
+                try:
+                    return float(temp) > 38.0
+                except (ValueError, TypeError):
+                    return False
+        elif indicator == "high_blood_pressure":
+            bp = vitals.get("blood_pressure")
+            if bp:
+                try:
+                    systolic = int(bp.split("/")[0])
+                    return systolic > 140
+                except (ValueError, IndexError, TypeError):
+                    return False
+        elif indicator == "rapid_heart_rate":
+            hr = vitals.get("heart_rate")
+            if hr:
+                try:
+                    return int(hr) > 100
+                except (ValueError, TypeError):
+                    return False
+        elif indicator == "rapid_breathing":
+            rr = vitals.get("respiratory_rate")
+            if rr:
+                try:
+                    return int(rr) > 20
+                except (ValueError, TypeError):
+                    return False
+        elif indicator == "low_oxygen":
+            oxygen = vitals.get("oxygen_saturation")
+            if oxygen:
+                try:
+                    return float(oxygen.replace("%", "")) < 95
+                except (ValueError, TypeError):
+                    return False
+        
+        return False
+    
+    def _adjust_for_demographics(self, score: float, condition_key: str, age: int, gender: str) -> float:
+        """Adjust match score based on patient demographics."""
+        adjusted_score = score
+        
+        # Age-related adjustments
+        if age > 65:
+            # Higher risk for cardiovascular conditions
+            if condition_key in ["myocardial_infarction", "hypertensive_crisis"]:
+                adjusted_score += 0.3
+        elif age < 18:
+            # Lower risk for certain adult conditions
+            if condition_key in ["hypertensive_crisis"]:
+                adjusted_score -= 0.5
+                
+        # Gender-related adjustments
+        if gender.lower() == "male":
+            if condition_key == "myocardial_infarction":
+                adjusted_score += 0.2
+        elif gender.lower() == "female":
+            if condition_key == "anxiety_panic_attack":
+                adjusted_score += 0.1
+                
+        return adjusted_score
+    
+    def _adjust_for_medical_history(self, score: float, condition_key: str, medical_history: List[str]) -> float:
+        """Adjust match score based on medical history."""
+        adjusted_score = score
+        
+        for history_item in medical_history:
+            history_lower = history_item.lower()
+            
+            if "hypertension" in history_lower and condition_key == "hypertensive_crisis":
+                adjusted_score += 0.4
+            elif "asthma" in history_lower and condition_key == "asthma_exacerbation":
+                adjusted_score += 0.5
+            elif "heart" in history_lower and condition_key == "myocardial_infarction":
+                adjusted_score += 0.3
+            elif "blood clot" in history_lower and condition_key == "pulmonary_embolism":
+                adjusted_score += 0.4
+                
+        return adjusted_score
+    
+    def _get_recommendations(self, condition_key: str) -> List[str]:
+        """Get recommendations for a specific condition."""
+        recommendations = {
+            "myocardial_infarction": [
+                "Immediate ECG monitoring",
+                "Cardiac enzyme panel",
+                "IV access establishment",
+                "Nitroglycerin for chest pain relief",
+                "Aspirin 325mg chewable",
+                "Oxygen therapy if hypoxic"
+            ],
+            "pneumonia": [
+                "Chest X-ray",
+                "Complete blood count",
+                "Sputum culture",
+                "Antibiotic therapy pending culture results",
+                "Oxygen therapy if hypoxic"
+            ],
+            "pulmonary_embolism": [
+                "D-dimer test",
+                "CT pulmonary angiogram",
+                "Anticoagulation therapy",
+                "Oxygen therapy",
+                "IV access"
+            ],
+            "asthma_exacerbation": [
+                "Peak flow measurement",
+                "Albuterol nebulizer treatment",
+                "Steroid therapy",
+                "Oxygen therapy if hypoxic",
+                "Continuous monitoring"
+            ],
+            "costochondritis": [
+                "Pain management with NSAIDs",
+                "Physical examination",
+                "ECG to rule out cardiac causes",
+                "Reassurance and education"
+            ],
+            "gastroesophageal_reflux": [
+                "Antacid therapy",
+                "Proton pump inhibitor trial",
+                "ECG to rule out cardiac causes",
+                "Dietary modifications"
+            ],
+            "anxiety_panic_attack": [
+                "Reassurance and calming techniques",
+                "Vital sign monitoring",
+                "ECG to rule out cardiac causes",
+                "Breathing exercises",
+                "Anxiolytic medication if indicated"
+            ],
+            "hypertensive_crisis": [
+                "Immediate blood pressure monitoring",
+                "IV antihypertensive therapy",
+                "ECG monitoring",
+                "Neurological assessment",
+                "Laboratory studies (creatinine, electrolytes)"
+            ]
+        }
+        
+        return recommendations.get(condition_key, ["Further evaluation recommended"])

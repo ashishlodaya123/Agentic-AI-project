@@ -60,3 +60,36 @@ export const getMetrics = () => {
 export const checkBackendStatus = () => {
   return apiClient.get('/');
 }
+
+// Advanced Agent Endpoints
+export const getTreatmentRecommendations = (requestData) => {
+  return apiClient.post('/api/agents/treatment', requestData);
+}
+
+export const getFollowupPlan = (requestData) => {
+  return apiClient.post('/api/agents/followup', requestData);
+}
+
+export const checkDrugInteractions = (requestData) => {
+  return apiClient.post('/api/agents/drug-interactions', requestData);
+}
+
+export const getSpecialistRecommendations = (requestData) => {
+  return apiClient.post('/api/agents/specialist', requestData);
+}
+
+export const runQualityAssurance = (requestData) => {
+  return apiClient.post('/api/agents/quality', requestData);
+}
+
+export const getDifferentialDiagnosis = (requestData) => {
+  return apiClient.post('/api/agents/differential-diagnosis', requestData);
+}
+
+export const getPredictiveAnalytics = (requestData) => {
+  return apiClient.post('/api/agents/predictive-analytics', requestData);
+}
+
+export const getClinicalVisualization = (requestData) => {
+  return apiClient.post('/api/agents/clinical-visualization', requestData);
+}

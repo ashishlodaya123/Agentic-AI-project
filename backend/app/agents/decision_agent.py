@@ -4,6 +4,14 @@ from app.agents.symptoms_vitals_agent import SymptomsVitalsAgent
 from app.agents.imaging_agent import MedicalImagingAgent
 from app.agents.rag_agent import KnowledgeRAGAgent
 from app.agents.risk_agent import RiskStratificationAgent
+from app.agents.treatment_agent import TreatmentRecommendationAgent
+from app.agents.followup_agent import FollowupPlanningAgent
+from app.agents.drug_interaction_agent import DrugInteractionAgent
+from app.agents.specialist_agent import SpecialistConsultationAgent
+from app.agents.quality_agent import QualityAssuranceAgent
+from app.agents.differential_diagnosis_agent import DifferentialDiagnosisAgent
+from app.agents.predictive_analytics_agent import PredictiveAnalyticsAgent
+from app.agents.clinical_visualization_agent import ClinicalVisualizationAgent
 import json
 import re
 import logging
@@ -19,6 +27,14 @@ class TriageState(TypedDict):
     image_analysis: Dict[str, Any]
     rag_results: List[dict]
     risk_assessment: Dict[str, Any]
+    treatment_recommendations: Optional[Dict[str, Any]]
+    followup_plan: Optional[Dict[str, Any]]
+    drug_interactions: Optional[Dict[str, Any]]
+    specialist_recommendations: Optional[Dict[str, Any]]
+    quality_assessment: Optional[Dict[str, Any]]
+    differential_diagnosis: Optional[Dict[str, Any]]
+    predictive_analytics: Optional[Dict[str, Any]]
+    clinical_visualization: Optional[Dict[str, Any]]
     final_recommendation: dict
 
 # --- Helper function to convert string response to structured data ---
@@ -125,6 +141,46 @@ def run_symptoms_vitals_agent(state: TriageState):
     
     return {"symptoms_analysis": result}
 
+def run_treatment_agent(state: TriageState):
+    agent = TreatmentRecommendationAgent()
+    result = agent.run(state['patient_data'], state['symptoms_analysis'], state['risk_assessment'])
+    return {"treatment_recommendations": result}
+
+def run_followup_agent(state: TriageState):
+    agent = FollowupPlanningAgent()
+    treatment_recommendations = state.get('treatment_recommendations') or {}
+    result = agent.run(state['patient_data'], state['symptoms_analysis'], state['risk_assessment'], treatment_recommendations)
+    return {"followup_plan": result}
+
+def run_drug_interaction_agent(state: TriageState):
+    agent = DrugInteractionAgent()
+    treatment_recommendations = state.get('treatment_recommendations') or {}
+    result = agent.run(state['patient_data'], treatment_recommendations)
+    return {"drug_interactions": result}
+
+def run_specialist_agent(state: TriageState):
+    agent = SpecialistConsultationAgent()
+    treatment_recommendations = state.get('treatment_recommendations') or {}
+    result = agent.run(state['patient_data'], state['symptoms_analysis'], state['risk_assessment'], treatment_recommendations)
+    return {"specialist_recommendations": result}
+
+def run_quality_agent(state: TriageState):
+    agent = QualityAssuranceAgent()
+    treatment_recommendations = state.get('treatment_recommendations') or {}
+    followup_plan = state.get('followup_plan') or {}
+    drug_interactions = state.get('drug_interactions') or {}
+    specialist_recommendations = state.get('specialist_recommendations') or {}
+    result = agent.run(
+        state['patient_data'],
+        state['symptoms_analysis'],
+        state['risk_assessment'],
+        treatment_recommendations,
+        followup_plan,
+        drug_interactions,
+        specialist_recommendations
+    )
+    return {"quality_assessment": result}
+
 def run_imaging_agent(state: TriageState):
     image_path = state['patient_data'].get('image_path')
     if image_path:
@@ -154,10 +210,46 @@ def run_risk_agent(state: TriageState):
     result = agent.run(state['patient_data'])
     return {"risk_assessment": result}
 
+def run_differential_diagnosis_agent(state: TriageState):
+    agent = DifferentialDiagnosisAgent()
+    result = agent.run(state['patient_data'], state['symptoms_analysis'], state['risk_assessment'])
+    return {"differential_diagnosis": result}
+
+def run_predictive_analytics_agent(state: TriageState):
+    agent = PredictiveAnalyticsAgent()
+    treatment_recommendations = state.get('treatment_recommendations') or {}
+    result = agent.run(state['patient_data'], state['symptoms_analysis'], state['risk_assessment'], treatment_recommendations)
+    return {"predictive_analytics": result}
+
+def run_clinical_visualization_agent(state: TriageState):
+    agent = ClinicalVisualizationAgent()
+    treatment_recommendations = state.get('treatment_recommendations') or {}
+    followup_plan = state.get('followup_plan') or {}
+    drug_interactions = state.get('drug_interactions') or {}
+    specialist_recommendations = state.get('specialist_recommendations') or {}
+    result = agent.run(
+        state['patient_data'],
+        state['symptoms_analysis'],
+        state['risk_assessment'],
+        treatment_recommendations,
+        followup_plan,
+        drug_interactions,
+        specialist_recommendations
+    )
+    return {"clinical_visualization": result}
+
 def generate_recommendation(state: TriageState):
     risk_assessment = state['risk_assessment']
     symptoms_analysis = state['symptoms_analysis']
     image_analysis = state['image_analysis']
+    treatment_recommendations = state.get('treatment_recommendations', {})
+    followup_plan = state.get('followup_plan', {})
+    drug_interactions = state.get('drug_interactions', {})
+    specialist_recommendations = state.get('specialist_recommendations', {})
+    quality_assessment = state.get('quality_assessment', {})
+    differential_diagnosis = state.get('differential_diagnosis', {})
+    predictive_analytics = state.get('predictive_analytics', {})
+    clinical_visualization = state.get('clinical_visualization', {})
     
     logger.info(f"Generating recommendation with symptoms analysis type: {type(symptoms_analysis)}")
     logger.info(f"Symptoms analysis keys: {symptoms_analysis.keys() if isinstance(symptoms_analysis, dict) else 'Not a dict'}")
@@ -183,6 +275,14 @@ def generate_recommendation(state: TriageState):
         "clinical_guidelines": rag_results,
         "imaging_analysis": image_analysis,
         "risk_assessment": risk_assessment,
+        "treatment_recommendations": treatment_recommendations,
+        "followup_plan": followup_plan,
+        "drug_interactions": drug_interactions,
+        "specialist_recommendations": specialist_recommendations,
+        "quality_assessment": quality_assessment,
+        "differential_diagnosis": differential_diagnosis,
+        "predictive_analytics": predictive_analytics,
+        "clinical_visualization": clinical_visualization,
         "next_steps": [
             triage_recommendation.get("action", "Clinical evaluation recommended"),
             "Document all findings in patient record",
@@ -202,13 +302,29 @@ class DecisionSupportAgent:
         workflow.add_node("imaging", run_imaging_agent)
         workflow.add_node("rag", run_rag_agent)
         workflow.add_node("risk", run_risk_agent)
+        workflow.add_node("treatment", run_treatment_agent)
+        workflow.add_node("followup", run_followup_agent)
+        workflow.add_node("drug_interactions", run_drug_interaction_agent)
+        workflow.add_node("specialist", run_specialist_agent)
+        workflow.add_node("quality", run_quality_agent)
+        workflow.add_node("differential_diagnosis", run_differential_diagnosis_agent)
+        workflow.add_node("predictive_analytics", run_predictive_analytics_agent)
+        workflow.add_node("clinical_visualization", run_clinical_visualization_agent)
         workflow.add_node("recommend", generate_recommendation)
 
         workflow.set_entry_point("symptoms_vitals")
         workflow.add_edge("symptoms_vitals", "imaging")
         workflow.add_edge("imaging", "rag")
         workflow.add_edge("rag", "risk")
-        workflow.add_edge("risk", "recommend")
+        workflow.add_edge("risk", "treatment")
+        workflow.add_edge("treatment", "followup")
+        workflow.add_edge("followup", "drug_interactions")
+        workflow.add_edge("drug_interactions", "specialist")
+        workflow.add_edge("specialist", "quality")
+        workflow.add_edge("quality", "differential_diagnosis")
+        workflow.add_edge("differential_diagnosis", "predictive_analytics")
+        workflow.add_edge("predictive_analytics", "clinical_visualization")
+        workflow.add_edge("clinical_visualization", "recommend")
         workflow.add_edge("recommend", END)
 
         self.graph = workflow.compile()
@@ -220,6 +336,14 @@ class DecisionSupportAgent:
             "image_analysis": {},
             "rag_results": [],
             "risk_assessment": {},
+            "treatment_recommendations": None,
+            "followup_plan": None,
+            "drug_interactions": None,
+            "specialist_recommendations": None,
+            "quality_assessment": None,
+            "differential_diagnosis": None,
+            "predictive_analytics": None,
+            "clinical_visualization": None,
             "final_recommendation": {}
         }
         final_state = self.graph.invoke(initial_state)

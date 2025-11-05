@@ -1,6 +1,7 @@
 import os
 from PIL import Image
 import json
+from app.core.agent_memory import get_agent_memory
 
 class MedicalImagingAgent:
     """
@@ -8,7 +9,7 @@ class MedicalImagingAgent:
     In a production environment, this would integrate with specialized medical imaging models.
     """
     def __init__(self):
-        pass
+        self.memory = get_agent_memory()
 
     def run(self, image_path: str) -> dict:
         """
@@ -17,11 +18,13 @@ class MedicalImagingAgent:
         try:
             # Check if file exists
             if not os.path.exists(image_path):
-                return {
+                result = {
                     "status": "error",
                     "message": "Image file not found.",
                     "analysis": None
                 }
+                self.memory.store_agent_output("imaging", result)
+                return result
                 
             # Get basic image information
             image = Image.open(image_path)
@@ -30,18 +33,24 @@ class MedicalImagingAgent:
             
             # Simple rule-based analysis
             analysis = self._analyze_image_properties(width, height, mode, image_path)
-            return {
+            result = {
                 "status": "success",
                 "message": "Image analysis completed successfully.",
                 "analysis": analysis
             }
             
+            # Store analysis in shared memory
+            self.memory.store_agent_output("imaging", result)
+            return result
+            
         except Exception as e:
-            return {
+            result = {
                 "status": "error",
                 "message": f"Error processing image: {str(e)}",
                 "analysis": None
             }
+            self.memory.store_agent_output("imaging", result)
+            return result
 
     def _analyze_image_properties(self, width: int, height: int, mode: str, image_path: str) -> dict:
         """Analyze image properties and return a medical imaging assessment."""

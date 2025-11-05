@@ -6,7 +6,7 @@ from starlette.responses import Response
 from prometheus_client import make_asgi_app, Counter, Histogram, Gauge
 import time
 from app.core.config import settings
-from app.routes import triage, metrics, database
+from app.routes import triage, metrics, database, advanced_agents
 from app.core.embedding import EmbeddingModel
 import logging
 
@@ -77,6 +77,7 @@ async def add_process_time_header(request: Request, call_next):
 app.include_router(triage.router, prefix="/api", tags=["Triage"])  # Removed authentication dependency
 app.include_router(metrics.router, prefix="/api", tags=["Metrics"])
 app.include_router(database.router, prefix="/api", tags=["Database"])
+app.include_router(advanced_agents.router, prefix="/api/agents", tags=["Advanced Agents"])
 
 # Add Prometheus metrics endpoint
 metrics_app = make_asgi_app()

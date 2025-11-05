@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FaExclamationTriangle, FaExclamationCircle, FaInfoCircle, FaHeartbeat, FaFileMedical, FaBookMedical, FaPrint, FaUserMd, FaTemperatureHigh, FaTint, FaWeight, FaCheck, FaTimes, FaAmbulance, FaStethoscope, FaHospital, FaClock } from 'react-icons/fa';
+import { FaExclamationTriangle, FaExclamationCircle, FaInfoCircle, FaHeartbeat, FaFileMedical, FaBookMedical, FaPrint, FaUserMd, FaTemperatureHigh, FaTint, FaWeight, FaCheck, FaTimes, FaAmbulance, FaStethoscope, FaHospital, FaClock, FaPrescription, FaCalendarAlt, FaCapsules, FaClipboardCheck } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import { getTaskResult } from '../api';
+import AdvancedAgentResults from '../components/AdvancedAgentResults';
+import ClinicalVisualizations from '../components/ClinicalVisualizations';
 
 const Results = () => {
   const { taskId } = useParams();
@@ -683,6 +685,47 @@ const Results = () => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Advanced Agent Results */}
+      <div className="mb-8">
+        <div className="card-header mb-4">
+          <h2 className="h2 text-neutral-text">Advanced Clinical Decision Support</h2>
+          <p className="body-large text-neutral-text-secondary mt-2">
+            Comprehensive treatment planning, follow-up care, and safety assessments
+          </p>
+        </div>
+        <AdvancedAgentResults 
+          taskId={taskId}
+          patientData={result?.result?.patient_data}
+          symptomsAnalysis={symptomsAnalysis}
+          riskAssessment={riskAssessment}
+          treatmentRecommendations={finalRecommendation?.treatment_recommendations}
+          followupPlan={finalRecommendation?.followup_plan}
+          drugInteractions={finalRecommendation?.drug_interactions}
+          specialistRecommendations={finalRecommendation?.specialist_recommendations}
+          qualityAssessment={finalRecommendation?.quality_assessment}
+        />
+      </div>
+
+      {/* Clinical Visualizations */}
+      <div className="mb-8">
+        <div className="card-header mb-4">
+          <h2 className="h2 text-neutral-text">Clinical Visualizations</h2>
+          <p className="body-large text-neutral-text-secondary mt-2">
+            Interactive charts and visual representations of clinical data
+          </p>
+        </div>
+        <ClinicalVisualizations 
+          taskId={taskId}
+          patientData={result?.result?.patient_data}
+          symptomsAnalysis={symptomsAnalysis}
+          riskAssessment={riskAssessment}
+          treatmentRecommendations={finalRecommendation?.treatment_recommendations}
+          followupPlan={finalRecommendation?.followup_plan}
+          drugInteractions={finalRecommendation?.drug_interactions}
+          specialistRecommendations={finalRecommendation?.specialist_recommendations}
+        />
       </div>
 
       {/* Task Information */}

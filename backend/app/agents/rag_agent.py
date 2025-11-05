@@ -6,6 +6,7 @@ import re
 import json
 import os
 from app.utils.medical_apis import search_medline, get_cdc_data, get_who_data
+from app.core.agent_memory import get_agent_memory
 
 class KnowledgeRAGAgent:
     """
@@ -19,6 +20,7 @@ class KnowledgeRAGAgent:
         self.collection = self.client.get_or_create_collection(
             name="clinical_guidelines",
         )
+        self.memory = get_agent_memory()
         # Initialize database if empty
         self._initialize_database_if_empty()
 
@@ -90,6 +92,13 @@ class KnowledgeRAGAgent:
         
         # Enhance results with relevance scoring and filtering
         enhanced_results = self._enhance_results(results, query, external_data)
+        
+        # Store results in shared memory
+        self.memory.store_agent_output("rag", {
+            "query": query,
+            "results": enhanced_results
+        })
+        
         return enhanced_results
 
     def _get_external_data(self, query: str) -> dict:

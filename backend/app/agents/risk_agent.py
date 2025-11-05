@@ -1,4 +1,5 @@
 import re
+from app.core.agent_memory import get_agent_memory
 
 class RiskStratificationAgent:
     """
@@ -6,7 +7,7 @@ class RiskStratificationAgent:
     Provides comprehensive risk assessment with detailed categorization.
     """
     def __init__(self):
-        pass
+        self.memory = get_agent_memory()
 
     def run(self, patient_data: dict) -> dict:
         """
@@ -26,6 +27,10 @@ class RiskStratificationAgent:
         
         # Calculate comprehensive risk assessment
         risk_assessment = self._comprehensive_risk_assessment(age, vitals, symptoms, gender)
+        
+        # Store risk assessment in shared memory
+        self.memory.store_agent_output("risk", risk_assessment)
+        
         return risk_assessment
 
     def _comprehensive_risk_assessment(self, age: int, vitals: dict, symptoms: str, gender: str) -> dict:
