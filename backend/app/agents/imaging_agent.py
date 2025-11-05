@@ -1,5 +1,6 @@
 import os
 from PIL import Image
+import json
 
 class MedicalImagingAgent:
     """
@@ -9,14 +10,18 @@ class MedicalImagingAgent:
     def __init__(self):
         pass
 
-    def run(self, image_path: str) -> str:
+    def run(self, image_path: str) -> dict:
         """
-        Analyzes an image and returns a rule-based classification.
+        Analyzes an image and returns a structured classification.
         """
         try:
             # Check if file exists
             if not os.path.exists(image_path):
-                return "Error: Image file not found."
+                return {
+                    "status": "error",
+                    "message": "Image file not found.",
+                    "analysis": None
+                }
                 
             # Get basic image information
             image = Image.open(image_path)
@@ -25,45 +30,79 @@ class MedicalImagingAgent:
             
             # Simple rule-based analysis
             analysis = self._analyze_image_properties(width, height, mode, image_path)
-            return analysis
+            return {
+                "status": "success",
+                "message": "Image analysis completed successfully.",
+                "analysis": analysis
+            }
             
         except Exception as e:
-            return f"Error processing image: {str(e)}"
+            return {
+                "status": "error",
+                "message": f"Error processing image: {str(e)}",
+                "analysis": None
+            }
 
-    def _analyze_image_properties(self, width: int, height: int, mode: str, image_path: str) -> str:
+    def _analyze_image_properties(self, width: int, height: int, mode: str, image_path: str) -> dict:
         """Analyze image properties and return a medical imaging assessment."""
         # Get file size
         file_size = os.path.getsize(image_path) / 1024  # in KB
         
         # Basic analysis based on image properties
         observations = []
+        recommendations = []
         
         # Resolution analysis
         if width < 200 or height < 200:
-            observations.append("low resolution")
+            observations.append("Low resolution image detected")
+            recommendations.append("Consider acquiring higher resolution imaging for better diagnostic quality")
         elif width > 2000 or height > 2000:
-            observations.append("high resolution")
+            observations.append("High resolution image detected")
+            recommendations.append("Image suitable for detailed analysis")
+        else:
+            observations.append("Standard resolution image")
             
         # Color mode analysis
+        color_info = ""
         if mode == "L":
-            observations.append("grayscale")
+            color_info = "Grayscale imaging"
+            observations.append("Grayscale image format")
         elif mode == "RGB":
-            observations.append("color")
+            color_info = "Color imaging"
+            observations.append("Color image format")
+            recommendations.append("Consider grayscale conversion for certain diagnostic applications")
+        else:
+            color_info = f"{mode} imaging"
+            observations.append(f"{mode} image format")
             
         # File size analysis
         if file_size < 50:
-            observations.append("low quality")
+            observations.append("Low file size")
+            recommendations.append("Image may be compressed; consider original quality for diagnostic purposes")
         elif file_size > 5000:
-            observations.append("high quality")
+            observations.append("High file size")
+            recommendations.append("Image quality appears optimal for diagnostic use")
+        else:
+            observations.append("Standard file size")
             
         # Common medical imaging types based on properties
-        if "grayscale" in observations and width > 500 and height > 500:
+        imaging_type = "General medical image"
+        specialty_recommendations = []
+        
+        if "grayscale" in [obs.lower() for obs in observations] and width > 500 and height > 500:
             imaging_type = "Likely X-ray or CT scan"
-        elif "color" in observations and width > 1000 and height > 1000:
+            specialty_recommendations.append("Consider radiology consultation for bone or internal structure analysis")
+        elif "color" in [obs.lower() for obs in observations] and width > 1000 and height > 1000:
             imaging_type = "Likely MRI or ultrasound"
-        else:
-            imaging_type = "General medical image"
-            
-        # Return analysis
-        observation_str = ", ".join(observations) if observations else "standard quality"
-        return f"Image analysis: {imaging_type} ({observation_str}). Dimensions: {width}x{height}px. File size: {file_size:.1f}KB."
+            specialty_recommendations.append("Consider specialist review for soft tissue or organ assessment")
+        
+        # Return structured analysis
+        return {
+            "imaging_type": imaging_type,
+            "dimensions": f"{width}x{height} pixels",
+            "color_format": color_info,
+            "file_size": f"{file_size:.1f} KB",
+            "observations": observations,
+            "recommendations": recommendations + specialty_recommendations,
+            "technical_quality": "Adequate" if width > 300 and height > 300 else "Suboptimal"
+        }

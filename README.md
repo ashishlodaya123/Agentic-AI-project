@@ -6,48 +6,65 @@ This project is an AI-powered, agentic healthcare decision-support system that p
 
 - **Multi-Agent Architecture:** Five specialized agents working together to analyze patient data
 - **Real-time Processing:** Asynchronous task processing with Celery and Redis
-- **Clinical Knowledge Base:** ChromaDB-powered RAG (Retrieval-Augmented Generation) system
+- **Clinical Knowledge Base:** ChromaDB-powered RAG (Retrieval-Augmented Generation) system with 10 detailed clinical guidelines
+- **External Medical Data Integration:** Direct access to MEDLINE, CDC, and WHO data sources
 - **Rule-Based Medical Logic:** Transparent clinical decision-making without black-box models
-- **Decision Visualization:** LangGraph-powered decision flow visualization
+- **Agent Orchestration:** LangGraph-powered decision flow with state management
 - **Monitoring & Metrics:** Prometheus endpoint for system monitoring
 - **Modern UI/UX:** React-based dashboard with Tailwind CSS styling
 
 ## 🏗️ Architecture Overview
 
-### Backend Architecture
+### Multi-Agent System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        FastAPI Server                       │
-├─────────────────────────────────────────────────────────────┤
-│  ┌──────────────────┐  ┌──────────────────┐  ┌────────────┐ │
-│  │   Triage API     │  │   Metrics API    │  │ Database   │ │
-│  │   Endpoints      │  │   Endpoints      │  │ Management │ │
-│  └──────────────────┘  └──────────────────┘  └────────────┘ │
-├─────────────────────────────────────────────────────────────┤
-│                    Celery Task Queue                        │
-├─────────────────────────────────────────────────────────────┤
-│  ┌──────────────────┐  ┌──────────────────┐  ┌────────────┐ │
-│  │ Decision Support │  │ Symptom & Vitals │  │ Risk       │ │
-│  │ Agent            │  │ Agent            │  │ Stratification││
-│  │ (LangGraph)      │  │                  │  │ Agent      │ │
-│  └──────────────────┘  └──────────────────┘  └────────────┘ │
-│  ┌──────────────────┐  ┌──────────────────┐                │
-│  │ Knowledge-RAG    │  │ Medical Imaging  │                │
-│  │ Agent            │  │ Agent            │                │
-│  └──────────────────┘  └──────────────────┘                │
-├─────────────────────────────────────────────────────────────┤
-│  Redis (Task Queue)    ChromaDB (Knowledge)   PyTorch      │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            FastAPI Server                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────────┐  │
+│  │   Triage API     │  │   Metrics API    │  │   Database Management    │  │
+│  │   Endpoints      │  │   Endpoints      │  │   (ChromaDB Init)        │  │
+│  └──────────────────┘  └──────────────────┘  └──────────────────────────┘  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                            Celery Task Queue                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │                    Decision Support Agent (Orchestrator)             │   │
+│  │                               │                                      │   │
+│  │                    ┌──────────▼──────────┐                           │   │
+│  │                    │ Symptom & Vitals    │                           │   │
+│  │                    │ Analysis Agent      │                           │   │
+│  │                    └──────────┬──────────┘                           │   │
+│  │                               │                                      │   │
+│  │                    ┌──────────▼──────────┐                           │   │
+│  │                    │ Medical Imaging     │                           │   │
+│  │                    │ Analysis Agent      │                           │   │
+│  │                    └──────────┬──────────┘                           │   │
+│  │                               │                                      │   │
+│  │                    ┌──────────▼──────────┐                           │   │
+│  │                    │ Knowledge-RAG       │                           │   │
+│  │                    │ Retrieval Agent     │                           │   │
+│  │                    └──────────┬──────────┘                           │   │
+│  │                               │                                      │   │
+│  │                    ┌──────────▼──────────┐                           │   │
+│  │                    │ Risk Stratification │                           │   │
+│  │                    │ Assessment Agent    │                           │   │
+│  │                    └─────────────────────┘                           │   │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Redis (Task Queue)    ChromaDB (Knowledge Base)   Sentence Transformers    │
+│  MEDLINE API (Literature)  CDC/WHO Direct Endpoints (Public Health Data)    │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Agent System
+### Agent Coordination Workflow
 
-1. **Symptom & Vitals Agent** - Parses and analyzes structured patient input using clinical rules
-2. **Medical Imaging Agent** - Analyzes medical images using rule-based logic
-3. **Knowledge-RAG Agent** - Retrieves relevant clinical guidelines from ChromaDB
-4. **Risk Stratification Agent** - Predicts patient risk using clinical rules instead of ML models
-5. **Decision Support Agent** - Orchestrates all agents using LangGraph to compose final recommendations
+1. **Symptom & Vitals Analysis Agent** - Parses and analyzes structured patient input using clinical rules
+2. **Medical Imaging Analysis Agent** - Analyzes medical images using rule-based logic for quality assessment
+3. **Knowledge-RAG Retrieval Agent** - Retrieves relevant clinical guidelines from ChromaDB using semantic search with external data integration
+4. **Risk Stratification Assessment Agent** - Predicts patient risk using comprehensive clinical rules
+5. **Decision Support Agent (Orchestrator)** - Coordinates all agents using LangGraph to compose final recommendations
 
 ## 📁 Project Structure
 
@@ -65,10 +82,14 @@ This project is an AI-powered, agentic healthcare decision-support system that p
 │   │   │   ├── celery_worker.py
 │   │   │   ├── config.py
 │   │   │   └── metrics.py
+│   │   ├── data/                # Clinical knowledge base
+│   │   │   └── clinical_guidelines.json
 │   │   ├── routes/              # API route definitions
 │   │   │   ├── database.py
 │   │   │   ├── metrics.py
 │   │   │   └── triage.py
+│   │   ├── utils/               # Utility functions
+│   │   │   └── medical_apis.py
 │   │   ├── main.py              # FastAPI application entry point
 │   │   └── tasks.py             # Celery task definitions
 │   ├── .env                     # Environment configuration
@@ -118,6 +139,9 @@ PROMETHEUS_PORT=9090
 CHROMA_DB_PATH=./chroma_data
 EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
 FASTAPI_PORT=8000
+# MEDLINE API key for enhanced medical literature search
+MEDLINE_API_KEY=your_medline_api_key
+# CDC and WHO data sources require no API keys
 ```
 
 #### Frontend Environment Variables
@@ -233,6 +257,7 @@ The application will be available at `http://localhost:5173`.
 ### Database Endpoints
 
 - `GET /api/initdb` - Initializes the ChromaDB with sample clinical guidelines
+- `GET /api/status` - Returns the current status of the database
 
 ### Monitoring Endpoints
 
@@ -241,25 +266,102 @@ The application will be available at `http://localhost:5173`.
 
 ## 🧠 Agent Details
 
-### Symptom & Vitals Agent
+### Symptom & Vitals Analysis Agent
 
-Processes patient symptoms and vital signs using clinical rules to generate a summary of key concerns.
+Processes patient symptoms and vital signs using clinical rules to generate a structured summary of key concerns with:
 
-### Medical Imaging Agent
+- Detailed vital signs assessment (heart rate, temperature, blood pressure)
+- Normal range comparisons with status indicators
+- Critical symptom identification
+- Demographic risk factor analysis
 
-Analyzes medical images using rule-based logic to assess image quality and provide contextual information.
+### Medical Imaging Analysis Agent
 
-### Knowledge-RAG Agent
+Analyzes medical images using rule-based logic to assess:
 
-Retrieves relevant clinical guidelines from ChromaDB using sentence-transformers embeddings with enhanced ranking.
+- Image quality and technical characteristics
+- Resolution and format analysis
+- Clinical imaging type identification (X-ray, CT, MRI, ultrasound)
+- Quality recommendations for diagnostic use
 
-### Risk Stratification Agent
+### Knowledge-RAG Retrieval Agent
 
-Predicts patient risk scores using clinical rules instead of ML models for transparency and explainability.
+Retrieves relevant clinical guidelines from ChromaDB using sentence-transformers embeddings with:
 
-### Decision Support Agent
+- Semantic search for relevant medical protocols
+- Relevance scoring and ranking
+- Enhanced filtering for clinical applicability
+- **External Data Integration**:
+  - MEDLINE/PubMed literature search (with API key)
+  - CDC public health guidelines (no API key required)
+  - WHO international health standards (no API key required)
+- Automatic fallback to local guidelines when external data is unavailable
+- Automatic database initialization with 10 comprehensive guidelines
 
-Orchestrates all agents using LangGraph to generate final triage recommendations with urgency levels (Green, Yellow, Red).
+### Risk Stratification Assessment Agent
+
+Predicts patient risk scores using comprehensive clinical rules for transparency and explainability:
+
+- Age-based risk factors
+- Vital sign abnormalities
+- Symptom severity scoring
+- Normalized risk score (0.0-1.0) with urgency levels
+
+### Decision Support Agent (Orchestrator)
+
+Orchestrates all agents using LangGraph to generate final triage recommendations:
+
+- State management for multi-step processing
+- Structured output formatting
+- Comprehensive urgency level classification (Green, Yellow, Red)
+- Clinical guideline integration with patient-specific data
+
+## 📚 Clinical Knowledge Base
+
+The system includes 10 comprehensive clinical guidelines covering:
+
+- Acute respiratory distress management
+- Acute coronary syndrome evaluation
+- Infectious disease fever protocol
+- Hypertensive crisis management
+- Altered mental status assessment
+- Acute abdominal pain evaluation
+- Tachycardia management protocol
+- Severe headache evaluation
+- Anaphylaxis emergency treatment
+- Diabetic emergency management
+
+Each guideline includes:
+
+- Detailed clinical protocols
+- Evidence-based treatment recommendations
+- Diagnostic criteria
+- Management strategies
+
+## 🔗 External Medical Data Integration
+
+The system integrates with external medical data sources to enhance recommendations:
+
+### MEDLINE/PubMed API
+
+- **Access**: Requires free registration with API key
+- **Benefits**: Access to recent medical literature and research
+- **Usage**: Automatically integrated when API key is provided
+- **Fallback**: Local guidelines used when API key is not provided
+
+### CDC Direct Endpoints
+
+- **Access**: Completely free, no API key required
+- **Benefits**: Public health guidelines and recommendations
+- **Usage**: Automatically integrated without configuration
+- **Reliability**: High availability with no rate limits
+
+### WHO Direct Endpoints
+
+- **Access**: Free access to public health data
+- **Benefits**: International health standards and guidelines
+- **Usage**: Automatically integrated without configuration
+- **Scope**: Global health recommendations and disease management
 
 ## 📊 Monitoring & Metrics
 
@@ -269,6 +371,7 @@ The system exposes Prometheus metrics at `/metrics` endpoint including:
 - Active Celery tasks
 - Successful triage completions
 - Average model inference time
+- Database query performance
 
 ## 🔧 Development Guidelines
 
@@ -278,6 +381,7 @@ The system exposes Prometheus metrics at `/metrics` endpoint including:
 2. API routes are defined in `app/routes/`
 3. Celery tasks are defined in `app/tasks.py`
 4. Configuration is managed through `app/core/config.py`
+5. External API integrations are handled in `app/utils/medical_apis.py`
 
 ### Frontend Development
 
@@ -322,46 +426,6 @@ To run frontend tests:
 cd frontend
 npm run test
 ```
-
-## 📚 Dependencies
-
-### Backend Dependencies
-
-- **FastAPI** - High-performance web framework
-- **Celery** - Distributed task queue
-- **Redis** - Message broker for Celery
-- **LangChain** - LLM integration framework
-- **LangGraph** - Agent workflow orchestration
-- **ChromaDB** - Vector database for RAG
-- **Sentence Transformers** - Embedding models
-- **Pillow** - Image processing
-- **Prometheus Client** - Metrics collection
-- **Pydantic** - Data validation
-
-### Frontend Dependencies
-
-- **React** - UI library
-- **Vite** - Build tool
-- **Tailwind CSS** - Styling framework
-- **Axios** - HTTP client
-- **Recharts** - Data visualization
-- **Framer Motion** - Animation library
-- **React Router** - Client-side routing
-
-## 🆘 Troubleshooting
-
-### Common Issues
-
-1. **Redis Connection Error**: Ensure Redis server is running and accessible
-2. **Embedding Model Loading**: Check internet connection for first-time downloads
-3. **Celery Worker Not Starting**: Verify Redis connection and Python environment
-4. **Frontend Not Connecting**: Check API base URL in frontend .env file
-
-### Logs and Debugging
-
-- Backend logs are displayed in the terminal where FastAPI is running
-- Celery worker logs show task processing information
-- Frontend logs can be viewed in the browser's developer console
 
 ## 📄 License
 

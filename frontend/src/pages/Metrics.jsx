@@ -19,7 +19,8 @@ const Metrics = () => {
         setLoading(false);
       })
       .catch((err) => {
-        setError('Failed to load metrics');
+        console.error('Metrics error:', err);
+        setError('Failed to load metrics: ' + (err.message || 'Unknown error'));
         setLoading(false);
       });
   }, []);
@@ -30,19 +31,26 @@ const Metrics = () => {
     
     const lines = text.split('\n');
     const data = [];
+    
     lines.forEach(line => {
+      // Skip comments and empty lines
+      if (line.startsWith('#') || line.trim() === '') return;
+      
+      // Parse http_requests_total metrics
       if (line.startsWith('http_requests_total')) {
-        const match = line.match(/endpoint="([^"]+)",method="([^"]+)",http_status="([^"]+)"} (\d+)/);
+        // Handle the Prometheus format: http_requests_total{method="GET",endpoint="/",http_status="200"} 1
+        const match = line.match(/http_requests_total\{method="([^"]*)",endpoint="([^"]*)",http_status="([^"]*)"\}\s+(\d+)/);
         if (match) {
           data.push({
-            endpoint: match[1],
-            method: match[2],
+            endpoint: match[2],
+            method: match[1],
             status: match[3],
             count: parseInt(match[4], 10)
           });
         }
       }
     });
+    
     return data;
   };
 
@@ -136,7 +144,7 @@ const Metrics = () => {
               </div>
               <div>
                 <p className="body-small text-neutral-text-secondary">Total Requests</p>
-                <p className="text-2xl font-bold text-neutral-text">{totalRequests}</p>
+                <p className="text-2xl font-bold text-neutral-text">{totalRequests || 0}</p>
               </div>
             </div>
           </div>
@@ -150,7 +158,7 @@ const Metrics = () => {
               </div>
               <div>
                 <p className="body-small text-neutral-text-secondary">Endpoints</p>
-                <p className="text-2xl font-bold text-neutral-text">{uniqueEndpoints}</p>
+                <p className="text-2xl font-bold text-neutral-text">{uniqueEndpoints || 0}</p>
               </div>
             </div>
           </div>
@@ -164,7 +172,7 @@ const Metrics = () => {
               </div>
               <div>
                 <p className="body-small text-neutral-text-secondary">Status Codes</p>
-                <p className="text-2xl font-bold text-neutral-text">{uniqueStatusCodes}</p>
+                <p className="text-2xl font-bold text-neutral-text">{uniqueStatusCodes || 0}</p>
               </div>
             </div>
           </div>
@@ -257,32 +265,40 @@ const Metrics = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-border">
-                {metrics.map((metric, index) => (
-                  <tr key={index} className="hover:bg-neutral-background">
-                    <td className="px-6 py-4 body-large text-neutral-text">{metric.endpoint}</td>
-                    <td className="px-6 py-4 body-large text-neutral-text">
-                      <span className={`badge ${
-                        metric.method === 'GET' ? 'badge-info' : 
-                        metric.method === 'POST' ? 'badge-success' : 
-                        metric.method === 'PUT' ? 'badge-warning' : 
-                        'badge-error'
-                      }`}>
-                        {metric.method}
-                      </span>
+                {metrics.length > 0 ? (
+                  metrics.map((metric, index) => (
+                    <tr key={index} className="hover:bg-neutral-background">
+                      <td className="px-6 py-4 body-large text-neutral-text">{metric.endpoint}</td>
+                      <td className="px-6 py-4 body-large text-neutral-text">
+                        <span className={`badge ${
+                          metric.method === 'GET' ? 'badge-info' : 
+                          metric.method === 'POST' ? 'badge-success' : 
+                          metric.method === 'PUT' ? 'badge-warning' : 
+                          'badge-error'
+                        }`}>
+                          {metric.method}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 body-large text-neutral-text">
+                        <span className={`badge ${
+                          metric.status.startsWith('2') ? 'badge-success' : 
+                          metric.status.startsWith('4') ? 'badge-warning' : 
+                          metric.status.startsWith('5') ? 'badge-error' : 
+                          'badge-info'
+                        }`}>
+                          {metric.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 body-large text-neutral-text font-medium">{metric.count}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" className="px-6 py-4 text-center body-large text-neutral-text-secondary">
+                      No metrics data available. Try interacting with the application to generate metrics.
                     </td>
-                    <td className="px-6 py-4 body-large text-neutral-text">
-                      <span className={`badge ${
-                        metric.status.startsWith('2') ? 'badge-success' : 
-                        metric.status.startsWith('4') ? 'badge-warning' : 
-                        metric.status.startsWith('5') ? 'badge-error' : 
-                        'badge-info'
-                      }`}>
-                        {metric.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 body-large text-neutral-text font-medium">{metric.count}</td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>

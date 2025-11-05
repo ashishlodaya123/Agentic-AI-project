@@ -3,7 +3,7 @@ from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
-from prometheus_client import make_asgi_app, Counter, Histogram
+from prometheus_client import make_asgi_app, Counter, Histogram, Gauge
 import time
 from app.core.config import settings
 from app.routes import triage, metrics, database
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 # --- Prometheus Metrics ---
 REQUEST_COUNT = Counter("http_requests_total", "Total HTTP Requests", ["method", "endpoint", "http_status"])
 REQUEST_LATENCY = Histogram("http_request_latency_seconds", "HTTP Request Latency", ["method", "endpoint"])
+ACTIVE_CONNECTIONS = Gauge("active_connections", "Number of active connections")
 
 # --- FastAPI App Initialization ---
 app = FastAPI(
@@ -39,6 +40,8 @@ app.add_middleware(
 async def startup_event():
     # Initialize the embedding model on startup
     EmbeddingModel.get_instance()
+    # Increment initial metrics to ensure there's data to display
+    REQUEST_COUNT.labels(method="GET", endpoint="/", http_status="200").inc()
 
 # --- API Key Authentication ---
 api_key_header = APIKeyHeader(name="X-API-KEY", auto_error=False)
@@ -55,9 +58,11 @@ async def get_api_key(api_key: str = Security(api_key_header)):
 # --- Middleware ---
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
+    ACTIVE_CONNECTIONS.inc()
     start_time = time.time()
     response = await call_next(request)
     process_time = time.time() - start_time
+    ACTIVE_CONNECTIONS.dec()
 
     endpoint = request.url.path
     method = request.method

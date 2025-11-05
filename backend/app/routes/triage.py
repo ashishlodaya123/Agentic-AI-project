@@ -3,10 +3,14 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from app.tasks import process_triage_request
 from celery.result import AsyncResult
+from prometheus_client import Counter
 import os
 import uuid
 
 router = APIRouter()
+
+# --- Prometheus Metrics for Triage ---
+TRIAGE_REQUESTS = Counter("triage_requests_total", "Total Triage Requests", ["status"])
 
 # --- Pydantic Models ---
 class PatientData(BaseModel):
@@ -24,8 +28,10 @@ async def run_triage(patient_data: PatientData):
     """
     try:
         task = process_triage_request.delay(patient_data.dict())
+        TRIAGE_REQUESTS.labels(status="started").inc()
         return {"task_id": task.id, "status": "Triage process started"}
     except Exception as e:
+        TRIAGE_REQUESTS.labels(status="failed").inc()
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- Image Upload Endpoint ---
@@ -61,6 +67,8 @@ async def get_triage_result(task_id: str):
     if task_result.state == 'PENDING':
         return {"status": "Pending"}
     elif task_result.state == 'FAILURE':
+        TRIAGE_REQUESTS.labels(status="failed").inc()
         return {"status": "Failed", "result": str(task_result.info)}
     else:
+        TRIAGE_REQUESTS.labels(status="completed").inc()
         return {"status": "Success", "result": task_result.get()}

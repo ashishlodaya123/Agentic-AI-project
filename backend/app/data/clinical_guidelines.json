@@ -1,0 +1,86 @@
+[
+  {
+    "id": "cg001",
+    "title": "Acute Respiratory Distress Management",
+    "content": "For patients presenting with acute respiratory distress, immediate assessment of airway, breathing, and circulation (ABC) is critical. Administer high-flow oxygen via non-rebreather mask initially. Obtain arterial blood gas analysis, complete blood count, and inflammatory markers. Perform chest X-ray and consider CT pulmonary angiography if pulmonary embolism is suspected. Administer bronchodilators for suspected bronchospasm. Consider non-invasive ventilation (BiPAP/CPAP) for cardiogenic pulmonary edema. Escalate to mechanical ventilation if hypoxemia persists despite maximal oxygen therapy. Monitor for development of acute respiratory distress syndrome (ARDS) with persistent hypoxemia and bilateral infiltrates. Consider prone positioning for severe ARDS. Initiate lung-protective ventilation strategies with low tidal volumes (6 mL/kg predicted body weight) and plateau pressures <30 cmH2O. Implement conservative fluid management after initial resuscitation. Consider corticosteroids in refractory cases. Monitor for ventilator-associated complications including pneumonia and barotrauma.",
+    "category": "respiratory",
+    "keywords": ["shortness of breath", "difficulty breathing", "respiratory distress", "hypoxemia", "dyspnea", "wheezing", "ARDS", "mechanical ventilation"]
+  },
+  {
+    "id": "cg002",
+    "title": "Acute Coronary Syndrome Evaluation",
+    "content": "All patients with chest pain require immediate 12-lead ECG within 10 minutes of arrival. Assess for ST-segment elevation myocardial infarction (STEMI) with ST elevation ≥1mm in ≥2 contiguous leads. Obtain cardiac biomarkers (troponin I/T, CK-MB) immediately and repeat in 3-6 hours if initially negative. Administer aspirin 162-325mg chewed immediately. For STEMI, activate cardiac catheterization lab within 90 minutes. For high-risk non-ST elevation ACS, consider urgent coronary angiography within 24 hours. Monitor for arrhythmias, heart failure, and cardiogenic shock. Provide nitroglycerin for ongoing ischemic pain unless contraindicated. Initiate dual antiplatelet therapy with aspirin and P2Y12 inhibitor (clopidogrel, ticagrelor, or prasugrel). Consider anticoagulation with unfractionated heparin, enoxaparin, or bivalirudin. Assess for contraindications to reperfusion therapy. Implement beta-blockade in hemodynamically stable patients without contraindications. Optimize medical therapy with ACE inhibitors/ARBs and statins. Consider mechanical circulatory support for cardiogenic shock.",
+    "category": "cardiac",
+    "keywords": ["chest pain", "cardiac", "heart", "angina", "myocardial infarction", "STEMI", "NSTEMI", "ECG", "troponin"]
+  },
+  {
+    "id": "cg003",
+    "title": "Infectious Disease Fever Protocol",
+    "content": "Evaluate source of fever with comprehensive history including travel, animal exposure, and immunization status. Perform targeted physical examination focusing on potential infection sources. Obtain blood cultures (2 sets), complete blood count with differential, comprehensive metabolic panel, and inflammatory markers (CRP, procalcitonin). Consider lumbar puncture in suspected meningitis with neck stiffness or altered mental status. Initiate empiric antibiotics in sepsis within 1 hour of recognition. Antipyretics (acetaminophen, ibuprofen) may be used for comfort but do not treat underlying infection. Consider infectious disease consultation for complex cases. Implement source control measures including drainage of abscesses and removal of infected devices. Monitor for sepsis progression with serial lactate measurements and hemodynamic assessment. Initiate vasopressors for persistent hypotension despite adequate fluid resuscitation. Consider corticosteroids in refractory septic shock. Assess for healthcare-associated vs. community-acquired pathogens to guide antibiotic selection.",
+    "category": "infectious_disease",
+    "keywords": ["fever", "high fever", "temperature", "infection", "sepsis", "bacteremia", "antibiotics", "procalcitonin"]
+  },
+  {
+    "id": "cg004",
+    "title": "Hypertensive Crisis Management",
+    "content": "Differentiate between hypertensive urgency (severe hypertension without end-organ damage) and hypertensive emergency (severe hypertension with end-organ damage). Hypertensive emergencies require immediate blood pressure reduction of 25% in first hour using IV antihypertensives like labetalol, nicardipine, or sodium nitroprusside. Monitor for end-organ damage including encephalopathy, myocardial ischemia, acute kidney injury, and aortic dissection. Hypertensive urgency can be managed with oral antihypertensives with follow-up in 24-48 hours. Avoid rapid blood pressure reduction which can cause organ hypoperfusion. For aortic dissection, target systolic blood pressure 100-120 mmHg with beta-blockade first. For acute stroke, avoid aggressive BP lowering unless >220/120 mmHg. For eclampsia, magnesium sulfate is preferred for seizure prophylaxis. For acute heart failure, consider nitroglycerin or nitroprusside with careful monitoring. Transition to oral agents once stable.",
+    "category": "cardiac",
+    "keywords": ["hypertension", "blood pressure", "hypertensive", "high blood pressure", "hypertensive crisis", "aortic dissection", "eclampsia"]
+  },
+  {
+    "id": "cg005",
+    "title": "Altered Mental Status Assessment",
+    "content": "Assess glucose level immediately using bedside glucometer. Consider stroke, seizure, intoxication, and metabolic causes in the differential diagnosis. Obtain non-contrast CT head if stroke or intracranial hemorrhage suspected. Check electrolytes, renal function, liver function, and toxicology screening as appropriate. Implement seizure precautions with IV access and suction available. Maintain airway protection and consider intubation if Glasgow Coma Scale <8 or inability to protect airway. Monitor for signs of increased intracranial pressure. For suspected stroke, evaluate for thrombolytic eligibility within 4.5 hours of symptom onset. Consider MRI for posterior circulation strokes or when CT is nondiagnostic. Implement DVT prophylaxis unless contraindicated. Monitor for complications including aspiration pneumonia and pressure ulcers. Consider lumbar puncture for suspected meningitis/encephalitis if CT is negative. Initiate empiric antimicrobials for suspected CNS infection.",
+    "category": "neurology",
+    "keywords": ["loss of consciousness", "altered mental status", "confusion", "seizure", "coma", "delirium", "stroke", "glucose"]
+  },
+  {
+    "id": "cg006",
+    "title": "Acute Abdominal Pain Evaluation",
+    "content": "Differentiate surgical from medical causes through detailed history, physical examination, and laboratory findings. Surgical causes include appendicitis, bowel obstruction, perforation, and ectopic pregnancy. Medical causes include pancreatitis, diverticulitis, inflammatory bowel disease, and gastroenteritis. Obtain complete blood count, comprehensive metabolic panel, lipase, and pregnancy test when appropriate. Consider CT abdomen/pelvis with contrast for unclear diagnoses. Early surgical consultation is critical for suspected surgical abdomen. Monitor for signs of peritonitis and sepsis. For suspected appendicitis, consider CT in equivocal cases or ultrasound in pregnant patients. For suspected pancreatitis, assess for gallstone etiology and consider ERCP in severe cases with cholangitis. For suspected bowel obstruction, nasogastric decompression and surgical consultation are indicated. Implement NPO status and IV fluid resuscitation. Consider lactate as a marker of bowel ischemia.",
+    "category": "gastroenterology",
+    "keywords": ["abdominal pain", "severe abdominal pain", "stomach pain", "GI", "appendicitis", "pancreatitis", "bowel obstruction"]
+  },
+  {
+    "id": "cg007",
+    "title": "Tachycardia Management Protocol",
+    "content": "Identify and treat underlying causes: dehydration, pain, anxiety, fever, or medications (thyrotoxicosis, cocaine). For hemodynamically unstable patients (hypotension, chest pain, heart failure), consider synchronized cardioversion. For stable patients, vagal maneuvers or adenosine may be effective for narrow complex tachycardia. Beta-blockers or calcium channel blockers are appropriate for atrial fibrillation with rapid ventricular response. Consider expert consultation for complex arrhythmias. Monitor electrolytes (potassium, magnesium) and thyroid function. Avoid calcium channel blockers in wide complex tachycardia until SVT confirmed. For atrial fibrillation, assess for anticoagulation needs using CHA2DS2-VASc score. Rate control with beta-blockers or non-dihydropyridine calcium channel blockers is first-line. Consider rhythm control in selected patients with recent-onset AF. For ventricular tachycardia, consider amiodarone or lidocaine. Implement anticoagulation bridging if interrupting warfarin for procedures.",
+    "category": "cardiac",
+    "keywords": ["tachycardia", "elevated heart rate", "fast heart rate", "arrhythmia", "atrial fibrillation", "ventricular tachycardia"]
+  },
+  {
+    "id": "cg008",
+    "title": "Severe Headache Evaluation",
+    "content": "Red flags include sudden onset (thunderclap), associated with neurological deficits, or in patients with known malignancy. Consider subarachnoid hemorrhage, meningitis, or brain tumor. Non-contrast CT head is first-line imaging for suspected subarachnoid hemorrhage within 6 hours of headache onset. Lumbar puncture may be needed if CT is negative but suspicion remains high. MRI/MRA may be indicated for suspected reversible cerebral vasoconstriction syndrome or pituitary apoplexy. Avoid opioids in suspected subarachnoid hemorrhage as they may mask neurological changes. For migraine, consider triptans in patients without contraindications. For cluster headaches, high-flow oxygen or sumatriptan may be effective. Implement preventive strategies for frequent headaches including lifestyle modifications and prophylactic medications. Consider neurosurgical consultation for mass lesions or increased intracranial pressure. Monitor for complications including hydrocephalus and vasospasm.",
+    "category": "neurology",
+    "keywords": ["severe headache", "headache", "migraine", "neurological", "thunderclap headache", "subarachnoid hemorrhage"]
+  },
+  {
+    "id": "cg009",
+    "title": "Anaphylaxis Emergency Treatment",
+    "content": "Recognize anaphylaxis by acute onset of skin/mucosal changes plus respiratory and/or cardiovascular compromise. Administer intramuscular epinephrine 0.3-0.5mg in lateral thigh immediately. Place patient in supine position with elevated legs unless respiratory distress present. Establish IV access and administer normal saline bolus for hypotension. Give antihistamines (diphenhydramine) and corticosteroids (methylprednisolone) as adjuncts. Observe for biphasic reactions for 4-6 hours. Consider ICU admission for severe cases. Provide patient education on allergen avoidance and epinephrine auto-injector use. For refractory hypotension, consider vasopressors. For bronchospasm, consider albuterol nebulizers. Monitor for complications including myocardial ischemia from epinephrine and laryngeal edema. Consider allergist referral for identification of triggers and desensitization protocols. Document reaction details for future reference.",
+    "category": "allergy_immunology",
+    "keywords": ["anaphylaxis", "allergic reaction", "hives", "wheezing", "swelling", "shock", "epinephrine"]
+  },
+  {
+    "id": "cg010",
+    "title": "Diabetic Emergency Management",
+    "content": "Differentiate diabetic ketoacidosis (DKA) from hyperosmolar hyperglycemic state (HHS). DKA presents with ketosis, acidosis, and elevated anion gap. HHS presents with extreme hyperglycemia (>600mg/dL) and profound dehydration without significant ketosis. Initiate IV fluid resuscitation with normal saline. Start insulin infusion after adequate fluid resuscitation. Monitor electrolytes closely, especially potassium. Correct acidosis only if pH <7.0. Identify and treat underlying precipitant (infection, myocardial infarction, pancreatitis). Transition to subcutaneous insulin before IV discontinuation. For DKA, initiate insulin at 0.1 units/kg/hour after initial fluid resuscitation. Replace potassium aggressively when levels are low. Monitor for cerebral edema, especially in children. For HHS, fluid replacement is more critical than insulin initially. Consider bicarbonate only in severe acidosis. Implement glucose monitoring every 1-2 hours. Educate patient on sick day management and insulin adjustment.",
+    "category": "endocrinology",
+    "keywords": ["diabetes", "hyperglycemia", "ketoacidosis", "insulin", "dehydration", "ketones", "DKA", "HHS"]
+  },
+  {
+    "id": "cg011",
+    "title": "Acute Heart Failure Management",
+    "content": "Assess for acute decompensated heart failure with signs of fluid overload and reduced cardiac output. Obtain ECG, chest X-ray, and cardiac biomarkers. Initiate oxygen therapy for hypoxemia. Administer IV furosemide for volume overload. Consider nitroglycerin for hypertension and myocardial ischemia. For hypotension, consider inotropic support with dobutamine or milrinone. Implement non-invasive ventilation for respiratory distress. Monitor for complications including renal dysfunction and electrolyte imbalances. Assess for precipitating factors including medication noncompliance, arrhythmias, and acute coronary syndrome. Consider ultrafiltration for refractory fluid overload. Initiate ACE inhibitors/ARBs and beta-blockers in stable patients. Implement sodium restriction and daily weight monitoring. Consider device therapy evaluation for advanced heart failure.",
+    "category": "cardiac",
+    "keywords": ["heart failure", "fluid overload", "dyspnea", "edema", "cardiogenic shock", "furosemide"]
+  },
+  {
+    "id": "cg012",
+    "title": "Severe Sepsis and Septic Shock Protocol",
+    "content": "Identify sepsis as life-threatening organ dysfunction caused by dysregulated host response to infection. Recognize septic shock as subset with circulatory, cellular, and metabolic abnormalities. Obtain blood cultures before antibiotic administration. Initiate empiric broad-spectrum antibiotics within 1 hour of recognition. Administer 30 mL/kg crystalloid for hypotension or lactate ≥4 mmol/L. Apply vasopressors for persistent hypotension despite fluid resuscitation, targeting mean arterial pressure ≥65 mmHg. Consider corticosteroids for refractory shock. Reassess antibiotic therapy based on culture results and clinical response. Implement source control measures including drainage and device removal. Monitor for complications including acute respiratory distress syndrome and acute kidney injury. Consider ICU admission for organ support needs. Implement glycemic control with insulin for hyperglycemia.",
+    "category": "critical_care",
+    "keywords": ["sepsis", "septic shock", "organ dysfunction", "infection", "vasopressors", "lactate"]
+  }
+]

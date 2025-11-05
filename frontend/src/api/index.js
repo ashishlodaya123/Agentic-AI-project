@@ -53,7 +53,8 @@ export const getTaskResult = (taskId) => {
 };
 
 export const getMetrics = () => {
-  return apiClient.get('/metrics');
+  // Use the direct /metrics endpoint instead of /api/metrics
+  return axios.get(`${baseURL}/metrics`);
 };
 
 export const checkBackendStatus = () => {
