@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    platform: linux/amd64
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - API_KEY=triage_secret_key
+      - CHROMA_DB_PATH=./chroma_data
+      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+      - FASTAPI_PORT=8000
+      # Add your MEDLINE API key here if you have one
+      # - MEDLINE_API_KEY=your_medline_api_key
+    depends_on:
+      - redis
+    volumes:
+      - ./backend:/app
+      - chroma_data:/app/chroma_data
+      - uploads:/app/uploads
+    restart: unless-stopped
+    platform: linux/amd64
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: celery -A app.core.celery_worker worker --loglevel=info --pool=solo
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - API_KEY=triage_secret_key
+      - CHROMA_DB_PATH=./chroma_data
+      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+    depends_on:
+      - redis
+      - backend
+    volumes:
+      - ./backend:/app
+      - chroma_data:/app/chroma_data
+      - uploads:/app/uploads
+    restart: unless-stopped
+    platform: linux/amd64
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=http://backend:8000
+      - VITE_API_KEY=triage_secret_key
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    restart: unless-stopped
+    platform: linux/amd64
+
+volumes:
+  redis_data:
+  chroma_data:
+  uploads:

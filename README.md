@@ -231,6 +231,93 @@ VITE_API_KEY=triage_secret_key
 
 The application will be available at `http://localhost:5173`.
 
+## 🐳 Docker Setup (Alternative to Manual Setup)
+
+For a more streamlined deployment, you can run the entire application using Docker Compose. This setup includes all necessary services (Redis, backend, worker, and frontend) in isolated containers.
+
+### Prerequisites
+
+- Docker Desktop 4.0+ (includes Docker Engine and Docker Compose)
+- For Windows users: Ensure Docker Desktop is configured to use WSL 2 backend
+
+### Running with Docker
+
+1. **Build and start all services:**
+
+   ```bash
+   docker-compose up --build
+   ```
+
+   For Windows users, if you encounter issues, try:
+
+   ```bash
+   docker-compose up --build --force-recreate
+   ```
+
+2. **Access the application:**
+
+   - Frontend: http://localhost:5173
+   - Backend API: http://localhost:8000
+   - Redis: localhost:6379
+
+3. **Initialize the database:**
+   After the services are running, initialize the ChromaDB with sample clinical guidelines:
+
+   ```bash
+   curl -X GET http://localhost:8000/api/initdb
+   ```
+
+4. **Stop the services:**
+
+   ```bash
+   docker-compose down
+   ```
+
+### Docker Environment Configuration
+
+The Docker setup uses the same environment variables as the manual setup but with container-specific values. You can customize these in the `docker-compose.yml` file:
+
+- **Backend Services**: Use `redis://redis:6379/0` as the Redis URL since Redis runs in a separate container
+- **Frontend**: Connects to the backend service via `http://backend:8000` within the Docker network
+
+To add your MEDLINE API key, uncomment and modify the environment variable in `docker-compose.yml`:
+
+```yaml
+# - MEDLINE_API_KEY=your_medline_api_key
+```
+
+### Development with Docker
+
+For development purposes, the Docker setup includes volume mounts that allow you to modify code locally and see changes reflected in the containers:
+
+- Backend code is mounted to `/app` in the backend and worker containers
+- Frontend code is mounted to `/app` in the frontend container
+- Data volumes persist Redis data, ChromaDB, and uploaded files between container restarts
+
+### Useful Docker Commands
+
+- **View logs:**
+
+  ```bash
+  docker-compose logs -f [service_name]
+  ```
+
+- **Execute commands in a running container:**
+
+  ```bash
+  docker-compose exec backend bash
+  docker-compose exec frontend sh
+  ```
+
+- **Rebuild specific services:**
+  ```bash
+  docker-compose build [service_name]
+  ```
+
+The Docker setup maintains full compatibility with the manual setup, so you can switch between them as needed. All data persisted in volumes will be available regardless of which setup you use.
+
+> **Note for Windows users**: If you experience performance issues with volume mounting, consider enabling the "Use gRPC FUSE for file sharing" option in Docker Desktop settings for better performance.
+
 ## 🌐 API Endpoints
 
 ### Triage Endpoints
