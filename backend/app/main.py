@@ -1,12 +1,13 @@
 from fastapi import FastAPI, Depends, HTTPException, Security
 from fastapi.security import APIKeyHeader
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 from prometheus_client import make_asgi_app, Counter, Histogram
 import time
 from app.core.config import settings
 from app.routes import triage, metrics, database
-from langchain.embeddings import SentenceTransformerEmbeddings
+from app.core.embedding import EmbeddingModel
 import logging
 
 # Configure logging
@@ -24,17 +25,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# --- Embedding Model Singleton ---
-class EmbeddingModel:
-    _instance = None
-
-    @classmethod
-    def get_instance(cls):
-        if cls._instance is None:
-            logger.info(f"Loading embedding model: {settings.EMBEDDING_MODEL}")
-            cls._instance = SentenceTransformerEmbeddings(model_name=settings.EMBEDDING_MODEL)
-            logger.info("Embedding model loaded successfully.")
-        return cls._instance
+# --- CORS Configuration ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for development
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"]
+)
 
 @app.on_event("startup")
 async def startup_event():
@@ -70,7 +69,7 @@ async def add_process_time_header(request: Request, call_next):
     return response
 
 # --- Routers ---
-app.include_router(triage.router, prefix="/api", tags=["Triage"], dependencies=[Depends(get_api_key)])
+app.include_router(triage.router, prefix="/api", tags=["Triage"])  # Removed authentication dependency
 app.include_router(metrics.router, prefix="/api", tags=["Metrics"])
 app.include_router(database.router, prefix="/api", tags=["Database"])
 

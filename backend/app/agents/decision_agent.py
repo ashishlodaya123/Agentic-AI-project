@@ -10,7 +10,7 @@ class TriageState(TypedDict):
     patient_data: dict
     symptoms_analysis: str
     image_analysis: Optional[str]
-    rag_results: List[str]
+    rag_results: List[dict]  # Changed to dict to include metadata
     risk_score: float
     final_recommendation: str
 
@@ -29,6 +29,7 @@ def run_imaging_agent(state: TriageState):
 
 def run_rag_agent(state: TriageState):
     agent = KnowledgeRAGAgent()
+    # Use symptoms analysis as the query for RAG
     result = agent.run(state['symptoms_analysis'])
     return {"rag_results": result}
 
@@ -40,27 +41,51 @@ def run_risk_agent(state: TriageState):
 def generate_recommendation(state: TriageState):
     risk_score = state['risk_score']
     symptoms_analysis = state['symptoms_analysis']
-    rag_results = "\\n- ".join(state['rag_results'])
-
+    
+    # Format RAG results
+    if state['rag_results']:
+        rag_results = "\n- ".join([str(result) for result in state['rag_results']])
+    else:
+        rag_results = "No relevant clinical guidelines found."
+    
+    # Determine urgency level
     urgency = "Low"
     color_code = "Green"
+    recommendation_text = "Routine care recommended"
+    
     if risk_score > 0.7:
         urgency = "High"
         color_code = "Red"
+        recommendation_text = "Immediate medical attention required"
     elif risk_score > 0.4:
         urgency = "Medium"
         color_code = "Yellow"
-
+        recommendation_text = "Prompt medical evaluation recommended"
+    
+    # Generate comprehensive recommendation
     recommendation = f"""
-    **Triage Recommendation**
-    - **Urgency Level:** {urgency}
-    - **Color Code:** {color_code}
-    - **Risk Score:** {risk_score:.2f}
-    - **Symptoms Analysis:** {symptoms_analysis}
-    - **Knowledge Base Insights:**
-      - {rag_results}
-    - **Imaging Analysis:** {state['image_analysis']}
-    """
+**Triage Recommendation**
+=========================
+
+**Urgency Level:** {urgency} ({color_code})
+**Risk Score:** {risk_score:.2f}
+**Recommended Action:** {recommendation_text}
+
+**Patient Analysis:**
+{symptoms_analysis}
+
+**Clinical Guidelines:**
+- {rag_results}
+
+**Imaging Analysis:**
+{state['image_analysis']}
+
+**Next Steps:**
+1. {"Contact emergency services immediately" if risk_score > 0.7 else "Schedule appointment with healthcare provider" if risk_score > 0.4 else "Monitor symptoms and follow up if needed"}
+2. Document all findings in patient record
+3. {"Consider specialist consultation" if risk_score > 0.5 else "Routine follow-up as needed"}
+"""
+    
     return {"final_recommendation": recommendation.strip()}
 
 # --- Graph Definition ---
