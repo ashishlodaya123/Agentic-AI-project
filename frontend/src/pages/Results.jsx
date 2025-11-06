@@ -27,7 +27,8 @@ import {
   FaEdit,
   FaSave,
   FaLock,
-  FaLockOpen
+  FaLockOpen,
+  FaSpinner
 } from "react-icons/fa";
 import { motion } from "framer-motion";
 import { getTaskResult, saveClinicianReview, getClinicianReview } from "../api";
@@ -46,7 +47,8 @@ const Results = () => {
     approved: false,
     notes: "",
     overrideRecommendations: false,
-    modifiedUrgency: ""
+    modifiedUrgency: "",
+    timestamp: null
   });
   const [isEditing, setIsEditing] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -107,17 +109,31 @@ const Results = () => {
   const loadClinicianReview = async () => {
     try {
       const response = await getClinicianReview(taskId);
+      
+      // Handle both success and not_found cases
       if (response.data.status === "success" && response.data.data) {
         const reviewData = response.data.data;
         setClinicianReview({
           approved: reviewData.approved || false,
           notes: reviewData.notes || "",
           overrideRecommendations: reviewData.override_recommendations || false,
-          modifiedUrgency: reviewData.modified_urgency || ""
+          modifiedUrgency: reviewData.modified_urgency || "",
+          timestamp: reviewData.timestamp || null
+        });
+      } else if (response.data.status === "not_found") {
+        // Reset to default values when no review exists
+        setClinicianReview({
+          approved: false,
+          notes: "",
+          overrideRecommendations: false,
+          modifiedUrgency: "",
+          timestamp: null
         });
       }
     } catch (err) {
-      console.log("No existing clinician review found");
+      console.error("Error loading clinician review:", err);
+      // Show error to user
+      alert(`Error loading review: ${err.message || "Please try again"}`);
     }
   };
 
@@ -144,6 +160,15 @@ const Results = () => {
   };
 
   const handleSaveReview = async () => {
+    // Show confirmation dialog
+    const confirmSave = window.confirm(
+      `Are you sure you want to save this review?\n\nStatus: ${clinicianReview.approved ? 'Approved' : 'Not Approved'}\n${clinicianReview.notes ? `Notes: ${clinicianReview.notes.substring(0, 100)}${clinicianReview.notes.length > 100 ? '...' : ''}` : 'No notes'}`
+    );
+    
+    if (!confirmSave) {
+      return;
+    }
+    
     setReviewLoading(true);
     try {
       const reviewData = {
@@ -158,13 +183,17 @@ const Results = () => {
       
       if (response.data.status === "success") {
         setIsEditing(false);
+        // Show success message with better UI feedback
         alert("Review saved successfully!");
+        // Reload the review to ensure UI is updated
+        loadClinicianReview();
       } else {
         throw new Error(response.data.message || "Failed to save review");
       }
     } catch (err) {
       console.error("Error saving clinician review:", err);
-      alert("Failed to save review. Please try again.");
+      // More descriptive error message
+      alert(`Failed to save review: ${err.message || "Please try again."}`);
     } finally {
       setReviewLoading(false);
     }
@@ -623,6 +652,34 @@ const Results = () => {
                   </button>
                 </div>
               </div>
+              
+              {/* Review Status Preview */}
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <h5 className="font-medium text-neutral-text mb-2">Review Status Preview</h5>
+                <div className="flex items-center">
+                  {clinicianReview.approved ? (
+                    <>
+                      <FaCheck className="text-green-600 mr-2" />
+                      <span className="text-green-800 font-medium">Approved</span>
+                    </>
+                  ) : (
+                    <>
+                      <FaTimes className="text-red-600 mr-2" />
+                      <span className="text-red-800 font-medium">Not Approved</span>
+                    </>
+                  )}
+                </div>
+                {clinicianReview.modifiedUrgency && (
+                  <div className="mt-2 text-sm text-neutral-text">
+                    Modified Urgency: <span className="font-medium">{clinicianReview.modifiedUrgency}</span>
+                  </div>
+                )}
+                {clinicianReview.overrideRecommendations && (
+                  <div className="mt-1 text-sm text-neutral-text">
+                    Overriding AI Recommendations
+                  </div>
+                )}
+              </div>
 
               <div>
                 <label className="form-label">Review Notes</label>
@@ -678,11 +735,16 @@ const Results = () => {
                   disabled={reviewLoading}
                 >
                   {reviewLoading ? (
-                    <FaSpinner className="animate-spin mr-2" />
+                    <>
+                      <FaSpinner className="animate-spin mr-2" />
+                      Saving...
+                    </>
                   ) : (
-                    <FaSave className="mr-2" />
+                    <>
+                      <FaSave className="mr-2" />
+                      Save Review
+                    </>
                   )}
-                  Save Review
                 </button>
               </div>
             </div>
@@ -718,6 +780,23 @@ const Results = () => {
                   </button>
                 </div>
               </div>
+
+              {clinicianReview.approved && (
+                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                  <div className="flex items-center mb-2">
+                    <FaCheck className="text-green-600 mr-2" />
+                    <h5 className="font-medium text-green-800">Review Completed</h5>
+                  </div>
+                  <p className="text-sm text-green-700">
+                    This assessment has been reviewed and approved by a clinician.
+                  </p>
+                  {clinicianReview.timestamp && (
+                    <p className="text-xs text-green-600 mt-2">
+                      Last updated: {new Date(clinicianReview.timestamp).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {clinicianReview.notes && (
                 <div className="p-4 bg-blue-50 rounded-lg">

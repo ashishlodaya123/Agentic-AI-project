@@ -6,7 +6,12 @@ from celery.result import AsyncResult
 from prometheus_client import Counter
 import os
 import uuid
+import asyncio
+from typing import TYPE_CHECKING
 from app.utils.iot_simulator import get_iot_vitals_data, stream_iot_vitals_data
+
+if TYPE_CHECKING:
+    from celery import Task
 
 router = APIRouter()
 
@@ -42,8 +47,8 @@ async def run_triage(patient_data: PatientData):
     Accepts patient data and initiates the triage process.
     """
     try:
-        # Using apply_async instead of delay to avoid type checking issues
-        task = process_triage_request.apply_async(args=[patient_data.dict()])
+        # Using delay method for better type checking
+        task = process_triage_request.delay(patient_data.dict())
         TRIAGE_REQUESTS.labels(status="started").inc()
         return {"task_id": task.id, "status": "Triage process started"}
     except Exception as e:
@@ -57,17 +62,24 @@ async def get_iot_vitals_data_endpoint(request: IoTDataRequest):
     Simulates IoT vital signs data for patient monitoring.
     """
     try:
+        # For the frontend pull button, we want instant response
+        # Only stream if explicitly requested with duration > 0
         if request.duration_seconds and request.duration_seconds > 0:
-            # Stream data over time
-            vitals_data = stream_iot_vitals_data(request.duration_seconds)
+            # Stream data over time - run in thread pool for better performance
+            vitals_data = await asyncio.get_event_loop().run_in_executor(
+                None, stream_iot_vitals_data, request.duration_seconds
+            )
             return {"status": "success", "data": vitals_data, "message": f"Streamed {len(vitals_data)} vital signs readings"}
         else:
-            # Single data point
-            # Handle the case where condition might be None
+            # Single data point - run in thread pool for better performance
             if request.condition:
-                vitals_data = get_iot_vitals_data(request.condition)
+                vitals_data = await asyncio.get_event_loop().run_in_executor(
+                    None, get_iot_vitals_data, request.condition
+                )
             else:
-                vitals_data = get_iot_vitals_data()
+                vitals_data = await asyncio.get_event_loop().run_in_executor(
+                    None, get_iot_vitals_data
+                )
             return {"status": "success", "data": vitals_data, "message": "Vital signs data generated successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -79,11 +91,23 @@ async def save_clinician_review(review: ClinicianReview):
     Save clinician review and approval of AI recommendations.
     """
     try:
+        # Validate required fields
+        if not review.task_id:
+            raise HTTPException(status_code=400, detail="Task ID is required")
+        
+        # Add timestamp to the review
+        import datetime
+        review_data = review.dict()
+        review_data["timestamp"] = datetime.datetime.now().isoformat()
+        
         # Store the review in memory (in production, this would go to a database)
-        clinician_reviews[review.task_id] = review.dict()
-        return {"status": "success", "message": "Review saved successfully"}
+        clinician_reviews[review.task_id] = review_data
+        return {"status": "success", "message": "Review saved successfully", "data": review_data}
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to save review: {str(e)}")
 
 @router.get("/clinician-review/{task_id}")
 async def get_clinician_review(task_id: str):
@@ -91,13 +115,19 @@ async def get_clinician_review(task_id: str):
     Retrieve clinician review for a specific task.
     """
     try:
+        if not task_id:
+            raise HTTPException(status_code=400, detail="Task ID is required")
+            
         review = clinician_reviews.get(task_id)
         if review:
             return {"status": "success", "data": review}
         else:
             return {"status": "not_found", "message": "No review found for this task"}
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve review: {str(e)}")
 
 # --- Image Upload Endpoint ---
 UPLOAD_DIRECTORY = "./uploads"

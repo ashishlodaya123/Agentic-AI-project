@@ -77,6 +77,7 @@ const TriageDashboard = () => {
     
     try {
       // Call the IoT endpoint to get real data
+      // Don't send duration to avoid streaming which causes delays
       const response = await getIoTVitalsData({});
       
       console.log('IoT API Response:', response);
@@ -88,14 +89,20 @@ const TriageDashboard = () => {
         // Log the vitals data for debugging
         console.log('IoT Vitals Data:', vitalsData);
         
+        // Check if vitalsData is an array (streamed data) or object (single data point)
+        let singleVitalsData = vitalsData;
+        if (Array.isArray(vitalsData) && vitalsData.length > 0) {
+          // Use the first data point if it's an array
+          singleVitalsData = vitalsData[0];
+          console.log('Using first data point from stream:', singleVitalsData);
+        }
+        
         setFormData(prev => ({
           ...prev,
           vitals: {
-            heart_rate: vitalsData.heart_rate || prev.vitals.heart_rate || "",
-            blood_pressure: vitalsData.blood_pressure || prev.vitals.blood_pressure || "",
-            temperature: vitalsData.temperature || prev.vitals.temperature || "",
-            // Note: oxygen_saturation and respiratory_rate are not in the form fields
-            // but we'll keep them in case they're added later
+            heart_rate: singleVitalsData.heart_rate || prev.vitals.heart_rate || "",
+            blood_pressure: singleVitalsData.blood_pressure || prev.vitals.blood_pressure || "",
+            temperature: singleVitalsData.temperature || prev.vitals.temperature || "",
           }
         }));
         

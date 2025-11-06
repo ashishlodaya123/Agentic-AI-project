@@ -32,6 +32,21 @@ apiClient.interceptors.response.use(
   },
   (error) => {
     console.error('API Response Error:', error.response?.status, error.response?.data, error.config?.url);
+    
+    // Handle network errors
+    if (!error.response) {
+      alert('Network error: Please check your connection and try again.');
+    } 
+    // Handle server errors
+    else if (error.response.status >= 500) {
+      alert('Server error: Please try again later.');
+    }
+    // Handle client errors
+    else if (error.response.status >= 400) {
+      const message = error.response.data?.detail || 'An error occurred';
+      alert(`Error: ${message}`);
+    }
+    
     return Promise.reject(error);
   }
 );
@@ -124,12 +139,40 @@ export const saveClinicianReview = (reviewData) => {
     })
     .catch(error => {
       console.error('Error saving clinician review:', error);
-      throw error;
+      
+      // Provide more user-friendly error messages
+      if (error.response) {
+        // Server responded with error status
+        const status = error.response.status;
+        const message = error.response.data?.detail || error.response.data?.message || 'Unknown server error';
+        
+        if (status === 400) {
+          throw new Error(`Invalid request: ${message}`);
+        } else if (status === 404) {
+          throw new Error(`Resource not found: ${message}`);
+        } else if (status >= 500) {
+          throw new Error('Server error. Please try again later.');
+        } else {
+          throw new Error(`Error saving review: ${message}`);
+        }
+      } else if (error.request) {
+        // Request was made but no response received
+        throw new Error('Network error. Please check your connection and try again.');
+      } else {
+        // Something else happened
+        throw new Error(`Error: ${error.message || 'Unknown error occurred'}`);
+      }
     });
 }
 
 export const getClinicianReview = (taskId) => {
   console.log('Fetching clinician review for task:', taskId);
+  
+  // Validate taskId
+  if (!taskId) {
+    return Promise.reject(new Error('Task ID is required'));
+  }
+  
   return apiClient.get(`/api/clinician-review/${taskId}`)
     .then(response => {
       console.log('Received clinician review:', response.data);
@@ -137,6 +180,21 @@ export const getClinicianReview = (taskId) => {
     })
     .catch(error => {
       console.error('Error fetching clinician review:', error);
-      throw error;
+      
+      // Handle case where review is not found (this is not necessarily an error)
+      if (error.response && error.response.status === 404) {
+        // Return a consistent structure for not found cases
+        return { data: { status: 'not_found', message: 'No review found for this task' } };
+      }
+      
+      // Handle other errors
+      if (error.response) {
+        const message = error.response.data?.detail || 'Unknown server error';
+        throw new Error(`Error fetching review: ${message}`);
+      } else if (error.request) {
+        throw new Error('Network error. Please check your connection.');
+      } else {
+        throw new Error(`Error: ${error.message || 'Unknown error occurred'}`);
+      }
     });
 }

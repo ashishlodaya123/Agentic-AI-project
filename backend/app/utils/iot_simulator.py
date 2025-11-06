@@ -128,7 +128,7 @@ class IoTSimulator:
         readings = []
         num_readings = duration_seconds // interval_seconds
         
-        for i in range(num_readings):
+        for i in range(min(num_readings, 10)):  # Limit to 10 readings max for performance
             # Most readings are normal, occasional abnormal readings
             if random.random() < 0.85:  # 85% chance of normal reading
                 vitals = self.generate_normal_vitals()
@@ -137,7 +137,7 @@ class IoTSimulator:
                 vitals = self.generate_abnormal_vitals(condition)
             
             readings.append(vitals)
-            time.sleep(0.1)  # Small delay to simulate real-time data
+            # Remove the sleep for better performance in API calls
         
         return readings
 
