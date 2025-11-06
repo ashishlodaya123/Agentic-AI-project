@@ -1,18 +1,34 @@
-import { FaBrain, FaChartArea, FaHeartbeat, FaExclamationTriangle } from 'react-icons/fa';
+import {
+  FaBrain,
+  FaChartArea,
+  FaHeartbeat,
+  FaExclamationTriangle,
+} from "react-icons/fa";
 
-const ClinicalInsightsSummary = ({ differentialDiagnosis, predictiveAnalytics, vitalSignsData, riskAssessment }) => {
+const ClinicalInsightsSummary = ({
+  differentialDiagnosis,
+  predictiveAnalytics,
+  vitalSignsData,
+  riskAssessment,
+}) => {
   // Get top diagnosis
-  const topDiagnosis = differentialDiagnosis?.differential_diagnosis?.[0] || null;
-  
+  const topDiagnosis =
+    differentialDiagnosis?.differential_diagnosis?.[0] || null;
+
   // Get high risk predictions
-  const highRiskPredictions = predictiveAnalytics?.complication_predictions?.filter(p => p.risk_level === 'high') || [];
-  
+  const highRiskPredictions =
+    predictiveAnalytics?.complication_predictions?.filter(
+      (p) => p.risk_level === "high"
+    ) || [];
+
   // Get abnormal vitals
-  const abnormalVitals = vitalSignsData?.data?.filter(v => v.status !== 'normal') || [];
-  
+  const abnormalVitals =
+    vitalSignsData?.data?.filter((v) => v.status !== "normal") || [];
+
   // Get risk level
   const riskScore = riskAssessment?.risk_score || 0;
-  const riskLevel = riskScore > 0.7 ? 'high' : riskScore > 0.4 ? 'moderate' : 'low';
+  const riskLevel =
+    riskScore > 0.7 ? "high" : riskScore > 0.4 ? "moderate" : "low";
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -31,11 +47,15 @@ const ClinicalInsightsSummary = ({ differentialDiagnosis, predictiveAnalytics, v
                 {topDiagnosis.condition}
               </div>
               <div className="flex items-center mt-1">
-                <span className={`badge ${
-                  topDiagnosis.severity === 'high' ? 'badge-error' :
-                  topDiagnosis.severity === 'moderate' ? 'badge-warning' :
-                  'badge-info'
-                } text-xs`}>
+                <span
+                  className={`badge ${
+                    topDiagnosis.severity === "high"
+                      ? "badge-error"
+                      : topDiagnosis.severity === "moderate"
+                      ? "badge-warning"
+                      : "badge-info"
+                  } text-xs`}
+                >
                   {topDiagnosis.severity}
                 </span>
                 <span className="badge badge-secondary text-xs ml-2">
@@ -112,11 +132,15 @@ const ClinicalInsightsSummary = ({ differentialDiagnosis, predictiveAnalytics, v
             </div>
             <h3 className="font-medium text-neutral-text">Overall Risk</h3>
           </div>
-          <div className={`text-lg font-bold ${
-            riskLevel === 'high' ? 'text-error' :
-            riskLevel === 'moderate' ? 'text-warning' :
-            'text-success'
-          }`}>
+          <div
+            className={`text-lg font-bold ${
+              riskLevel === "high"
+                ? "text-error"
+                : riskLevel === "moderate"
+                ? "text-warning"
+                : "text-success"
+            }`}
+          >
             {riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1)} risk
           </div>
           <div className="text-sm text-neutral-text-secondary mt-1">

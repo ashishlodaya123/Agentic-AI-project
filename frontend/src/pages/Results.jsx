@@ -28,7 +28,7 @@ import {
   FaSave,
   FaLock,
   FaLockOpen,
-  FaSpinner
+  FaSpinner,
 } from "react-icons/fa";
 import { motion } from "framer-motion";
 import { getTaskResult, saveClinicianReview, getClinicianReview } from "../api";
@@ -48,7 +48,7 @@ const Results = () => {
     notes: "",
     overrideRecommendations: false,
     modifiedUrgency: "",
-    timestamp: null
+    timestamp: null,
   });
   const [isEditing, setIsEditing] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -109,7 +109,7 @@ const Results = () => {
   const loadClinicianReview = async () => {
     try {
       const response = await getClinicianReview(taskId);
-      
+
       // Handle both success and not_found cases
       if (response.data.status === "success" && response.data.data) {
         const reviewData = response.data.data;
@@ -118,7 +118,7 @@ const Results = () => {
           notes: reviewData.notes || "",
           overrideRecommendations: reviewData.override_recommendations || false,
           modifiedUrgency: reviewData.modified_urgency || "",
-          timestamp: reviewData.timestamp || null
+          timestamp: reviewData.timestamp || null,
         });
       } else if (response.data.status === "not_found") {
         // Reset to default values when no review exists
@@ -127,7 +127,7 @@ const Results = () => {
           notes: "",
           overrideRecommendations: false,
           modifiedUrgency: "",
-          timestamp: null
+          timestamp: null,
         });
       }
     } catch (err) {
@@ -146,29 +146,37 @@ const Results = () => {
   };
 
   const handleApproveRecommendations = () => {
-    setClinicianReview(prev => ({
+    setClinicianReview((prev) => ({
       ...prev,
-      approved: true
+      approved: true,
     }));
   };
 
   const handleRejectRecommendations = () => {
-    setClinicianReview(prev => ({
+    setClinicianReview((prev) => ({
       ...prev,
-      approved: false
+      approved: false,
     }));
   };
 
   const handleSaveReview = async () => {
     // Show confirmation dialog
     const confirmSave = window.confirm(
-      `Are you sure you want to save this review?\n\nStatus: ${clinicianReview.approved ? 'Approved' : 'Not Approved'}\n${clinicianReview.notes ? `Notes: ${clinicianReview.notes.substring(0, 100)}${clinicianReview.notes.length > 100 ? '...' : ''}` : 'No notes'}`
+      `Are you sure you want to save this review?\n\nStatus: ${
+        clinicianReview.approved ? "Approved" : "Not Approved"
+      }\n${
+        clinicianReview.notes
+          ? `Notes: ${clinicianReview.notes.substring(0, 100)}${
+              clinicianReview.notes.length > 100 ? "..." : ""
+            }`
+          : "No notes"
+      }`
     );
-    
+
     if (!confirmSave) {
       return;
     }
-    
+
     setReviewLoading(true);
     try {
       const reviewData = {
@@ -176,11 +184,11 @@ const Results = () => {
         approved: clinicianReview.approved,
         notes: clinicianReview.notes,
         override_recommendations: clinicianReview.overrideRecommendations,
-        modified_urgency: clinicianReview.modifiedUrgency
+        modified_urgency: clinicianReview.modifiedUrgency,
       };
 
       const response = await saveClinicianReview(reviewData);
-      
+
       if (response.data.status === "success") {
         setIsEditing(false);
         // Show success message with better UI feedback
@@ -625,7 +633,9 @@ const Results = () => {
             <div className="bg-purple-100 p-2 rounded-lg mr-3">
               <FaUserMd className="h-5 w-5 text-purple-600" />
             </div>
-            <h3 className="h3 text-neutral-text">Clinician Review & Approval</h3>
+            <h3 className="h3 text-neutral-text">
+              Clinician Review & Approval
+            </h3>
           </div>
         </div>
         <div className="card-body">
@@ -637,41 +647,64 @@ const Results = () => {
                 </h4>
                 <div className="flex space-x-2">
                   <button
-                    onClick={() => setClinicianReview(prev => ({ ...prev, approved: true }))}
-                    className={`btn ${clinicianReview.approved ? 'btn-success' : 'btn-outline'}`}
+                    onClick={() =>
+                      setClinicianReview((prev) => ({
+                        ...prev,
+                        approved: true,
+                      }))
+                    }
+                    className={`btn ${
+                      clinicianReview.approved ? "btn-success" : "btn-outline"
+                    }`}
                   >
                     <FaCheck className="mr-2" />
                     Approve
                   </button>
                   <button
-                    onClick={() => setClinicianReview(prev => ({ ...prev, approved: false }))}
-                    className={`btn ${!clinicianReview.approved ? 'btn-error' : 'btn-outline'}`}
+                    onClick={() =>
+                      setClinicianReview((prev) => ({
+                        ...prev,
+                        approved: false,
+                      }))
+                    }
+                    className={`btn ${
+                      !clinicianReview.approved ? "btn-error" : "btn-outline"
+                    }`}
                   >
                     <FaTimes className="mr-2" />
                     Reject
                   </button>
                 </div>
               </div>
-              
+
               {/* Review Status Preview */}
               <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <h5 className="font-medium text-neutral-text mb-2">Review Status Preview</h5>
+                <h5 className="font-medium text-neutral-text mb-2">
+                  Review Status Preview
+                </h5>
                 <div className="flex items-center">
                   {clinicianReview.approved ? (
                     <>
                       <FaCheck className="text-green-600 mr-2" />
-                      <span className="text-green-800 font-medium">Approved</span>
+                      <span className="text-green-800 font-medium">
+                        Approved
+                      </span>
                     </>
                   ) : (
                     <>
                       <FaTimes className="text-red-600 mr-2" />
-                      <span className="text-red-800 font-medium">Not Approved</span>
+                      <span className="text-red-800 font-medium">
+                        Not Approved
+                      </span>
                     </>
                   )}
                 </div>
                 {clinicianReview.modifiedUrgency && (
                   <div className="mt-2 text-sm text-neutral-text">
-                    Modified Urgency: <span className="font-medium">{clinicianReview.modifiedUrgency}</span>
+                    Modified Urgency:{" "}
+                    <span className="font-medium">
+                      {clinicianReview.modifiedUrgency}
+                    </span>
                   </div>
                 )}
                 {clinicianReview.overrideRecommendations && (
@@ -687,7 +720,12 @@ const Results = () => {
                   className="form-control"
                   rows="4"
                   value={clinicianReview.notes}
-                  onChange={(e) => setClinicianReview(prev => ({ ...prev, notes: e.target.value }))}
+                  onChange={(e) =>
+                    setClinicianReview((prev) => ({
+                      ...prev,
+                      notes: e.target.value,
+                    }))
+                  }
                   placeholder="Add your clinical notes and observations here..."
                 />
               </div>
@@ -698,7 +736,12 @@ const Results = () => {
                   <select
                     className="form-control"
                     value={clinicianReview.modifiedUrgency}
-                    onChange={(e) => setClinicianReview(prev => ({ ...prev, modifiedUrgency: e.target.value }))}
+                    onChange={(e) =>
+                      setClinicianReview((prev) => ({
+                        ...prev,
+                        modifiedUrgency: e.target.value,
+                      }))
+                    }
                   >
                     <option value="">Keep AI Recommendation</option>
                     <option value="critical">Critical</option>
@@ -714,7 +757,12 @@ const Results = () => {
                       type="checkbox"
                       className="form-checkbox"
                       checked={clinicianReview.overrideRecommendations}
-                      onChange={(e) => setClinicianReview(prev => ({ ...prev, overrideRecommendations: e.target.checked }))}
+                      onChange={(e) =>
+                        setClinicianReview((prev) => ({
+                          ...prev,
+                          overrideRecommendations: e.target.checked,
+                        }))
+                      }
                     />
                     <span className="ml-2">Override AI Recommendations</span>
                   </label>
@@ -785,14 +833,18 @@ const Results = () => {
                 <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                   <div className="flex items-center mb-2">
                     <FaCheck className="text-green-600 mr-2" />
-                    <h5 className="font-medium text-green-800">Review Completed</h5>
+                    <h5 className="font-medium text-green-800">
+                      Review Completed
+                    </h5>
                   </div>
                   <p className="text-sm text-green-700">
-                    This assessment has been reviewed and approved by a clinician.
+                    This assessment has been reviewed and approved by a
+                    clinician.
                   </p>
                   {clinicianReview.timestamp && (
                     <p className="text-xs text-green-600 mt-2">
-                      Last updated: {new Date(clinicianReview.timestamp).toLocaleString()}
+                      Last updated:{" "}
+                      {new Date(clinicianReview.timestamp).toLocaleString()}
                     </p>
                   )}
                 </div>
@@ -800,7 +852,9 @@ const Results = () => {
 
               {clinicianReview.notes && (
                 <div className="p-4 bg-blue-50 rounded-lg">
-                  <h5 className="font-medium text-neutral-text mb-2">Review Notes</h5>
+                  <h5 className="font-medium text-neutral-text mb-2">
+                    Review Notes
+                  </h5>
                   <p className="body-small text-neutral-text-secondary">
                     {clinicianReview.notes}
                   </p>
@@ -809,9 +863,14 @@ const Results = () => {
 
               {clinicianReview.modifiedUrgency && (
                 <div className="p-4 bg-amber-50 rounded-lg">
-                  <h5 className="font-medium text-neutral-text mb-2">Modified Urgency</h5>
+                  <h5 className="font-medium text-neutral-text mb-2">
+                    Modified Urgency
+                  </h5>
                   <p className="body-small text-neutral-text-secondary">
-                    Urgency level changed to: <span className="font-medium">{clinicianReview.modifiedUrgency}</span>
+                    Urgency level changed to:{" "}
+                    <span className="font-medium">
+                      {clinicianReview.modifiedUrgency}
+                    </span>
                   </p>
                 </div>
               )}
@@ -1210,7 +1269,7 @@ const Results = () => {
                   </div>
                 </div>
               </div>
-              
+
               {/* Enterprise Image Analysis */}
               {imagingAnalysis.analysis?.image_statistics && (
                 <div className="mt-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
@@ -1223,7 +1282,11 @@ const Results = () => {
                         Image Statistics
                       </h5>
                       <pre className="text-xs text-neutral-text-secondary bg-white p-2 rounded mt-1 overflow-x-auto">
-                        {JSON.stringify(imagingAnalysis.analysis.image_statistics, null, 2)}
+                        {JSON.stringify(
+                          imagingAnalysis.analysis.image_statistics,
+                          null,
+                          2
+                        )}
                       </pre>
                     </div>
                     <div>
@@ -1231,7 +1294,11 @@ const Results = () => {
                         Quality Metrics
                       </h5>
                       <pre className="text-xs text-neutral-text-secondary bg-white p-2 rounded mt-1 overflow-x-auto">
-                        {JSON.stringify(imagingAnalysis.analysis.quality_metrics, null, 2)}
+                        {JSON.stringify(
+                          imagingAnalysis.analysis.quality_metrics,
+                          null,
+                          2
+                        )}
                       </pre>
                     </div>
                     <div>
@@ -1244,7 +1311,11 @@ const Results = () => {
                             Analysis Confidence
                           </span>
                           <span className="font-medium">
-                            {(imagingAnalysis.analysis.enterprise_confidence * 100).toFixed(1)}%
+                            {(
+                              imagingAnalysis.analysis.enterprise_confidence *
+                              100
+                            ).toFixed(1)}
+                            %
                           </span>
                         </div>
                       </div>
@@ -1344,7 +1415,9 @@ const Results = () => {
           patientData={result?.result?.patient_data}
           symptomsAnalysis={symptomsAnalysis}
           riskAssessment={riskAssessment}
-          treatmentRecommendations={finalRecommendation?.treatment_recommendations}
+          treatmentRecommendations={
+            finalRecommendation?.treatment_recommendations
+          }
         />
       </div>
 

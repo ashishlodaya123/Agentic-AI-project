@@ -26,33 +26,40 @@ const Metrics = () => {
   const [allMetrics, setAllMetrics] = useState({
     httpRequests: [],
     latency: [],
-    other: []
+    other: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    console.log('Fetching metrics...');
+    console.log("Fetching metrics...");
     getMetrics()
       .then((response) => {
-        console.log('Metrics response received:', response);
+        console.log("Metrics response received:", response);
         // Check if response data exists
         if (response && response.data) {
-          console.log('Raw metrics data length:', response.data.length);
-          console.log('Raw metrics data type:', typeof response.data);
+          console.log("Raw metrics data length:", response.data.length);
+          console.log("Raw metrics data type:", typeof response.data);
           // Log first 2000 characters to see what we're working with
-          console.log('First 2000 chars of raw data:', response.data.substring(0, 2000));
+          console.log(
+            "First 2000 chars of raw data:",
+            response.data.substring(0, 2000)
+          );
           const parsedMetrics = parsePrometheusMetrics(response.data);
-          console.log('Setting metrics state with', parsedMetrics.length, 'entries');
-          console.log('All metrics data:', allMetrics);
+          console.log(
+            "Setting metrics state with",
+            parsedMetrics.length,
+            "entries"
+          );
+          console.log("All metrics data:", allMetrics);
           setMetrics(parsedMetrics);
         } else {
-          console.log('No response data received');
+          console.log("No response data received");
           setMetrics([]);
           setAllMetrics({
             httpRequests: [],
             latency: [],
-            other: []
+            other: [],
           });
         }
         setLoading(false);
@@ -64,7 +71,7 @@ const Metrics = () => {
         setAllMetrics({
           httpRequests: [],
           latency: [],
-          other: []
+          other: [],
         });
         setLoading(false);
       });
@@ -73,7 +80,7 @@ const Metrics = () => {
   const parsePrometheusMetrics = (text) => {
     // Check if text exists
     if (!text) {
-      console.log('No text to parse');
+      console.log("No text to parse");
       return [];
     }
 
@@ -81,39 +88,46 @@ const Metrics = () => {
     const httpRequestData = [];
     const latencyData = [];
     const otherMetrics = [];
-    
+
     console.log(`Parsing ${lines.length} lines of metrics data`);
 
     // Parse all types of metrics
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      
+
       // Skip comments and empty lines
       if (line.startsWith("#") || line.trim() === "") continue;
-      
+
       // Handle http_requests_total metrics
-      if (line.includes("http_requests_total") && line.includes("method=") && line.includes("endpoint=") && line.includes("http_status=")) {
+      if (
+        line.includes("http_requests_total") &&
+        line.includes("method=") &&
+        line.includes("endpoint=") &&
+        line.includes("http_status=")
+      ) {
         try {
           // Extract everything between the braces
-          const start = line.indexOf('{');
-          const end = line.indexOf('}');
+          const start = line.indexOf("{");
+          const end = line.indexOf("}");
           if (start !== -1 && end !== -1 && end > start) {
             const labels = line.substring(start + 1, end);
             const valuePart = line.substring(end + 1).trim();
             const value = parseFloat(valuePart);
-            
+
             // Parse the labels
             const methodMatch = labels.match(/method="([^"]+)"/);
             const endpointMatch = labels.match(/endpoint="([^"]+)"/);
             const statusMatch = labels.match(/http_status="([^"]+)"/);
-            
+
             if (methodMatch && endpointMatch && statusMatch) {
               const method = methodMatch[1];
               const endpoint = endpointMatch[1];
               const status = statusMatch[1];
-              
-              console.log(`Found HTTP request metric: method=${method}, endpoint=${endpoint}, status=${status}, value=${value}`);
-              
+
+              console.log(
+                `Found HTTP request metric: method=${method}, endpoint=${endpoint}, status=${status}, value=${value}`
+              );
+
               if (!isNaN(value)) {
                 httpRequestData.push({
                   endpoint: endpoint,
@@ -129,34 +143,40 @@ const Metrics = () => {
         }
       }
       // Handle http_request_latency_seconds metrics (histogram)
-      else if (line.includes("http_request_latency_seconds") && line.includes("method=") && line.includes("endpoint=")) {
+      else if (
+        line.includes("http_request_latency_seconds") &&
+        line.includes("method=") &&
+        line.includes("endpoint=")
+      ) {
         try {
           // Extract everything between the braces
-          const start = line.indexOf('{');
-          const end = line.indexOf('}');
+          const start = line.indexOf("{");
+          const end = line.indexOf("}");
           if (start !== -1 && end !== -1 && end > start) {
             const labels = line.substring(start + 1, end);
             const valuePart = line.substring(end + 1).trim();
             const value = parseFloat(valuePart);
-            
+
             // Parse the labels
             const methodMatch = labels.match(/method="([^"]+)"/);
             const endpointMatch = labels.match(/endpoint="([^"]+)"/);
-            
+
             if (methodMatch && endpointMatch) {
               const method = methodMatch[1];
               const endpoint = endpointMatch[1];
-              
+
               // Check if this is a count, sum, or bucket metric
-              let metricType = 'bucket';
+              let metricType = "bucket";
               if (line.includes("_count{")) {
-                metricType = 'count';
+                metricType = "count";
               } else if (line.includes("_sum{")) {
-                metricType = 'sum';
+                metricType = "sum";
               }
-              
-              console.log(`Found latency metric: method=${method}, endpoint=${endpoint}, type=${metricType}, value=${value}`);
-              
+
+              console.log(
+                `Found latency metric: method=${method}, endpoint=${endpoint}, type=${metricType}, value=${value}`
+              );
+
               if (!isNaN(value)) {
                 latencyData.push({
                   endpoint: endpoint,
@@ -172,17 +192,22 @@ const Metrics = () => {
         }
       }
       // Handle other metrics
-      else if (line.includes("{") && line.includes("}") && !line.includes("http_requests_total") && !line.includes("http_request_latency_seconds")) {
+      else if (
+        line.includes("{") &&
+        line.includes("}") &&
+        !line.includes("http_requests_total") &&
+        !line.includes("http_request_latency_seconds")
+      ) {
         try {
           // Extract metric name and value
-          const braceIndex = line.indexOf('{');
+          const braceIndex = line.indexOf("{");
           if (braceIndex !== -1) {
             const metricName = line.substring(0, braceIndex);
-            const endBraceIndex = line.indexOf('}');
+            const endBraceIndex = line.indexOf("}");
             const labels = line.substring(braceIndex + 1, endBraceIndex);
             const valuePart = line.substring(endBraceIndex + 1).trim();
             const value = parseFloat(valuePart);
-            
+
             if (!isNaN(value)) {
               otherMetrics.push({
                 name: metricName,
@@ -192,12 +217,12 @@ const Metrics = () => {
             }
           } else {
             // Handle metrics without labels
-            const spaceIndex = line.lastIndexOf(' ');
+            const spaceIndex = line.lastIndexOf(" ");
             if (spaceIndex !== -1) {
               const metricName = line.substring(0, spaceIndex);
               const valuePart = line.substring(spaceIndex + 1).trim();
               const value = parseFloat(valuePart);
-              
+
               if (!isNaN(value)) {
                 otherMetrics.push({
                   name: metricName,
@@ -215,21 +240,21 @@ const Metrics = () => {
     console.log(`Parsed ${httpRequestData.length} HTTP request metrics`);
     console.log(`Parsed ${latencyData.length} latency metrics`);
     console.log(`Parsed ${otherMetrics.length} other metrics`);
-    
+
     // Store all metrics in state
     setAllMetrics({
       httpRequests: httpRequestData,
       latency: latencyData,
-      other: otherMetrics
+      other: otherMetrics,
     });
-    
+
     return httpRequestData;
   };
 
   // Prepare data for pie chart
   const getStatusData = () => {
     if (metrics.length === 0) return [];
-    
+
     const statusCounts = {};
     metrics.forEach((metric) => {
       const status = metric.status;
@@ -237,91 +262,93 @@ const Metrics = () => {
         statusCounts[status] = (statusCounts[status] || 0) + metric.count;
       }
     });
-    
-    console.log('Status counts:', statusCounts);
+
+    console.log("Status counts:", statusCounts);
 
     return Object.keys(statusCounts).map((status) => ({
       name: `Status ${status}`,
       value: statusCounts[status],
     }));
   };
-  
+
   // Prepare data for endpoint chart
   const getEndpointData = () => {
     if (metrics.length === 0) return [];
-    
+
     const endpointCounts = {};
     metrics.forEach((metric) => {
       const endpoint = metric.endpoint;
       if (endpoint) {
-        endpointCounts[endpoint] = (endpointCounts[endpoint] || 0) + metric.count;
+        endpointCounts[endpoint] =
+          (endpointCounts[endpoint] || 0) + metric.count;
       }
     });
-    
-    console.log('Endpoint counts:', endpointCounts);
+
+    console.log("Endpoint counts:", endpointCounts);
 
     return Object.keys(endpointCounts).map((endpoint) => ({
       name: endpoint,
       count: endpointCounts[endpoint],
     }));
   };
-  
+
   // Prepare latency data for charts
   const getLatencyData = () => {
     if (!allMetrics.latency || allMetrics.latency.length === 0) return [];
-    
+
     // Group latency data by endpoint and method
     const latencyMap = {};
-    
-    allMetrics.latency.forEach(metric => {
+
+    allMetrics.latency.forEach((metric) => {
       const key = `${metric.endpoint}-${metric.method}`;
       if (!latencyMap[key]) {
         latencyMap[key] = {
           endpoint: metric.endpoint,
           method: metric.method,
           count: 0,
-          sum: 0
+          sum: 0,
         };
       }
-      
-      if (metric.type === 'count') {
+
+      if (metric.type === "count") {
         latencyMap[key].count = metric.value;
-      } else if (metric.type === 'sum') {
+      } else if (metric.type === "sum") {
         latencyMap[key].sum = metric.value;
       }
     });
-    
+
     // Calculate average latency
-    const result = Object.values(latencyMap).map(item => {
-      const avgLatency = item.count > 0 ? (item.sum / item.count) : 0;
+    const result = Object.values(latencyMap).map((item) => {
+      const avgLatency = item.count > 0 ? item.sum / item.count : 0;
       return {
         name: `${item.endpoint} (${item.method})`,
         latency: avgLatency,
-        count: item.count
+        count: item.count,
       };
     });
-    
-    console.log('Latency data:', result);
+
+    console.log("Latency data:", result);
     return result;
   };
-  
+
   // Get other interesting metrics
   const getOtherMetrics = () => {
     if (!allMetrics.other || allMetrics.other.length === 0) return [];
-    
+
     // Filter for interesting metrics (counters, gauges, etc.)
-    const interestingMetrics = allMetrics.other.filter(metric => 
-      metric.name.includes('total') || 
-      metric.name.includes('count') || 
-      metric.name.includes('active') ||
-      metric.name.includes('gc') ||
-      metric.name.includes('triage')
+    const interestingMetrics = allMetrics.other.filter(
+      (metric) =>
+        metric.name.includes("total") ||
+        metric.name.includes("count") ||
+        metric.name.includes("active") ||
+        metric.name.includes("gc") ||
+        metric.name.includes("triage")
     );
-    
-    console.log('Other interesting metrics:', interestingMetrics);
+
+    console.log("Other interesting metrics:", interestingMetrics);
     return interestingMetrics;
   };
-  
+
   const COLORS = ["#2563EB", "#16A34A", "#EA580C", "#DC2626", "#8B5CF6"];
 
   if (loading) {
@@ -363,23 +390,34 @@ const Metrics = () => {
   const endpointData = getEndpointData();
   const latencyData = getLatencyData();
   const otherMetrics = getOtherMetrics();
-  
+
   // Debug chart data
-  console.log('Status data for chart:', statusData);
-  console.log('Endpoint data for chart:', endpointData);
-  console.log('Latency data for chart:', latencyData);
-  console.log('Other metrics:', otherMetrics);
+  console.log("Status data for chart:", statusData);
+  console.log("Endpoint data for chart:", endpointData);
+  console.log("Latency data for chart:", latencyData);
+  console.log("Other metrics:", otherMetrics);
 
   // Calculate summary metrics
   const totalRequests = metrics.reduce((sum, m) => sum + (m.count || 0), 0);
-  const uniqueEndpoints = metrics.length > 0 ? [...new Set(metrics.map((m) => m.endpoint))].length : 0;
-  const uniqueStatusCodes = metrics.length > 0 ? [...new Set(metrics.map((m) => m.status))].length : 0;
-  
+  const uniqueEndpoints =
+    metrics.length > 0
+      ? [...new Set(metrics.map((m) => m.endpoint))].length
+      : 0;
+  const uniqueStatusCodes =
+    metrics.length > 0 ? [...new Set(metrics.map((m) => m.status))].length : 0;
+
   // Calculate latency summary
-  const avgLatency = latencyData.length > 0 ? 
-    latencyData.reduce((sum, m) => sum + m.latency, 0) / latencyData.length : 0;
-  
-  console.log('Summary metrics:', {totalRequests, uniqueEndpoints, uniqueStatusCodes, avgLatency});
+  const avgLatency =
+    latencyData.length > 0
+      ? latencyData.reduce((sum, m) => sum + m.latency, 0) / latencyData.length
+      : 0;
+
+  console.log("Summary metrics:", {
+    totalRequests,
+    uniqueEndpoints,
+    uniqueStatusCodes,
+    avgLatency,
+  });
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -445,7 +483,7 @@ const Metrics = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="card">
           <div className="card-body">
             <div className="flex items-center">
@@ -457,7 +495,7 @@ const Metrics = () => {
                   Avg Latency
                 </p>
                 <p className="text-2xl font-bold text-neutral-text">
-                  {avgLatency ? `${(avgLatency * 1000).toFixed(2)}ms` : '0ms'}
+                  {avgLatency ? `${(avgLatency * 1000).toFixed(2)}ms` : "0ms"}
                 </p>
               </div>
             </div>
@@ -556,11 +594,13 @@ const Metrics = () => {
             </div>
           </div>
         </div>
-        
+
         {/* Latency by Endpoint */}
         <div className="card">
           <div className="card-header">
-            <h3 className="h3 text-neutral-text">Average Latency by Endpoint</h3>
+            <h3 className="h3 text-neutral-text">
+              Average Latency by Endpoint
+            </h3>
           </div>
           <div className="card-body">
             <div className="h-80">
@@ -569,9 +609,11 @@ const Metrics = () => {
                   <BarChart data={latencyData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                     <XAxis dataKey="name" stroke="#64748B" />
-                    <YAxis 
-                      stroke="#64748B" 
-                      tickFormatter={(value) => `${(value * 1000).toFixed(2)}ms`}
+                    <YAxis
+                      stroke="#64748B"
+                      tickFormatter={(value) =>
+                        `${(value * 1000).toFixed(2)}ms`
+                      }
                     />
                     <Tooltip
                       contentStyle={{
@@ -581,7 +623,10 @@ const Metrics = () => {
                         boxShadow:
                           "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
                       }}
-                      formatter={(value) => [`${(value * 1000).toFixed(2)}ms`, 'Latency']}
+                      formatter={(value) => [
+                        `${(value * 1000).toFixed(2)}ms`,
+                        "Latency",
+                      ]}
                     />
                     <Legend />
                     <Bar
@@ -594,13 +639,14 @@ const Metrics = () => {
                 </ResponsiveContainer>
               ) : (
                 <div className="flex items-center justify-center h-full text-neutral-text-secondary">
-                  No latency data available. Interact with the application to generate latency metrics.
+                  No latency data available. Interact with the application to
+                  generate latency metrics.
                 </div>
               )}
             </div>
           </div>
         </div>
-        
+
         {/* Request Count by Endpoint (from latency data) */}
         <div className="card">
           <div className="card-header">
@@ -634,7 +680,8 @@ const Metrics = () => {
                 </ResponsiveContainer>
               ) : (
                 <div className="flex items-center justify-center h-full text-neutral-text-secondary">
-                  No request count data available. Interact with the application to generate metrics.
+                  No request count data available. Interact with the application
+                  to generate metrics.
                 </div>
               )}
             </div>
@@ -714,7 +761,8 @@ const Metrics = () => {
                       colSpan="4"
                       className="px-6 py-4 text-center body-large text-neutral-text-secondary"
                     >
-                      No metrics data available. Try interacting with the application to generate metrics.
+                      No metrics data available. Try interacting with the
+                      application to generate metrics.
                       {loading ? " Loading..." : ""}
                     </td>
                   </tr>
@@ -724,7 +772,7 @@ const Metrics = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Latency Data Table */}
       {latencyData.length > 0 && (
         <div className="card mt-8">
@@ -754,10 +802,10 @@ const Metrics = () => {
                   {latencyData.map((metric, index) => (
                     <tr key={index} className="hover:bg-neutral-background">
                       <td className="px-6 py-4 body-large text-neutral-text">
-                        {metric.name.split(' (')[0]}
+                        {metric.name.split(" (")[0]}
                       </td>
                       <td className="px-6 py-4 body-large text-neutral-text">
-                        {metric.name.split(' (')[1]?.split(')')[0] || 'N/A'}
+                        {metric.name.split(" (")[1]?.split(")")[0] || "N/A"}
                       </td>
                       <td className="px-6 py-4 body-large text-neutral-text">
                         {metric.count}
@@ -773,7 +821,7 @@ const Metrics = () => {
           </div>
         </div>
       )}
-      
+
       {/* Other Metrics Table */}
       {otherMetrics.length > 0 && (
         <div className="card mt-8">
@@ -803,7 +851,7 @@ const Metrics = () => {
                         {metric.name}
                       </td>
                       <td className="px-6 py-4 body-large text-neutral-text">
-                        {metric.labels || 'N/A'}
+                        {metric.labels || "N/A"}
                       </td>
                       <td className="px-6 py-4 body-large text-neutral-text font-medium">
                         {metric.value}

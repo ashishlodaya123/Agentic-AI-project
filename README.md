@@ -371,7 +371,7 @@ The Docker setup maintains full compatibility with the manual setup, so you can 
   ```json
   {
     "condition": "chest_pain", // Optional: specific medical condition to simulate
-    "duration_seconds": 60     // Optional: stream data over time (0 for single reading)
+    "duration_seconds": 60 // Optional: stream data over time (0 for single reading)
   }
   ```
 
