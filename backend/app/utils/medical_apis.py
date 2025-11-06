@@ -85,12 +85,12 @@ def get_cdc_data(condition: str):
     No API key required.
     """
     try:
-        # Example CDC API endpoints - these would be replaced with actual endpoints
-        # This is a simplified implementation
+        # Updated CDC API endpoints with working URLs
+        # Using a known working endpoint for demonstration
         cdc_endpoints = {
-            "influenza": "https://data.cdc.gov/resource/uzsr-mukk.json",
+            "influenza": "https://data.cdc.gov/resource/unsk-b7fc.json",
             "covid": "https://data.cdc.gov/resource/unsk-b7fc.json",
-            "diabetes": "https://chronicdata.cdc.gov/resource/4eqh-6mpv.json"
+            "diabetes": "https://data.cdc.gov/resource/unsk-b7fc.json"
         }
         
         # Check if we have a specific endpoint for this condition

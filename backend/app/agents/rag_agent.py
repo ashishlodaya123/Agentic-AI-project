@@ -105,10 +105,22 @@ class KnowledgeRAGAgent:
         """
         Retrieve data from external medical sources with fallback.
         """
+        if not settings.ENABLE_EXTERNAL_APIS:
+            return {
+                "medline": {"status": "skipped", "message": "External API calls disabled"},
+                "cdc": {"status": "skipped", "message": "External API calls disabled"},
+                "who": {"status": "skipped", "message": "External API calls disabled"}
+            }
+        
+        # Get data from external APIs
+        medline_data = search_medline(query)
+        cdc_data = get_cdc_data(query)
+        who_data = get_who_data(query)
+        
         external_data = {
-            "medline": {"status": "skipped", "message": "External API calls disabled for performance"},
-            "cdc": {"status": "skipped", "message": "External API calls disabled for performance"},
-            "who": {"status": "skipped", "message": "External API calls disabled for performance"}
+            "medline": medline_data,
+            "cdc": cdc_data,
+            "who": who_data
         }
         return external_data
 
@@ -228,7 +240,7 @@ class KnowledgeRAGAgent:
             if result not in prioritized_results:
                 prioritized_results.append(result)
         
-        return prioritized_results[:6]  # Return top 6 most relevant results
+        return prioritized_results[:8]  # Return top 8 most relevant results to include external sources
 
     def _calculate_relevance(self, query: str, document: str) -> float:
         """
