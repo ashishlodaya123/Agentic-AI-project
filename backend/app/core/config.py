@@ -16,9 +16,11 @@ class Settings(BaseSettings):
     CDC_API_KEY: Optional[str] = None
     WHO_API_KEY: Optional[str] = None
     NIH_API_KEY: Optional[str] = None
+    MEDICAL_IMAGING_API_KEY: Optional[str] = None
     
     # Enable/disable external API calls
     ENABLE_EXTERNAL_APIS: bool = True
+    ENABLE_MEDICAL_IMAGING_ANALYSIS: bool = False
 
     class Config:
         env_file = ".env"

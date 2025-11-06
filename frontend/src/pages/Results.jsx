@@ -1323,6 +1323,89 @@ const Results = () => {
                   </div>
                 </div>
               )}
+              
+              {/* Medical Imaging Analysis */}
+              {imagingAnalysis.analysis?.medical_findings && (
+                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h4 className="font-medium text-neutral-text mb-3">
+                    Medical Imaging Analysis
+                  </h4>
+                  <div className="space-y-4">
+                    <div>
+                      <h5 className="font-medium text-neutral-text mb-2">
+                        Medical Findings
+                      </h5>
+                      <ul className="list-disc pl-5 space-y-1">
+                        {imagingAnalysis.analysis.medical_findings.map(
+                          (finding, index) => (
+                            <li
+                              key={index}
+                              className="body-small text-neutral-text-secondary"
+                            >
+                              {finding}
+                            </li>
+                          )
+                        )}
+                      </ul>
+                    </div>
+                    
+                    <div>
+                      <h5 className="font-medium text-neutral-text mb-2">
+                        Clinical Recommendations
+                      </h5>
+                      <ul className="list-disc pl-5 space-y-1">
+                        {imagingAnalysis.analysis.clinical_recommendations.map(
+                          (recommendation, index) => (
+                            <li
+                              key={index}
+                              className="body-small text-neutral-text-secondary"
+                            >
+                              {recommendation}
+                            </li>
+                          )
+                        )}
+                      </ul>
+                    </div>
+                    
+                    <div className="flex justify-between items-center pt-2 border-t border-blue-100">
+                      <div>
+                        <h5 className="font-medium text-neutral-text text-sm">
+                          Medical Confidence
+                        </h5>
+                        <div className="w-32 bg-gray-200 rounded-full h-2 mt-1">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full" 
+                            style={{ width: `${(imagingAnalysis.analysis.medical_confidence || 0) * 100}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      <span className="text-sm font-medium text-neutral-text">
+                        {((imagingAnalysis.analysis.medical_confidence || 0) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    
+                    {imagingAnalysis.analysis.interpretation_notes && imagingAnalysis.analysis.interpretation_notes.length > 0 && (
+                      <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <h5 className="font-medium text-neutral-text text-sm mb-1">
+                          Interpretation Notes
+                        </h5>
+                        <ul className="list-disc pl-5 space-y-1">
+                          {imagingAnalysis.analysis.interpretation_notes.map(
+                            (note, index) => (
+                              <li
+                                key={index}
+                                className="text-xs text-neutral-text-secondary"
+                              >
+                                {note}
+                              </li>
+                            )
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="prose max-w-none">

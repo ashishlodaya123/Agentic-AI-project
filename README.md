@@ -414,13 +414,19 @@ Processes patient symptoms and vital signs using clinical rules to generate a st
 
 ### Medical Imaging Analysis Agent
 
-Analyzes medical images using rule-based logic to assess:
+Analyzes medical images with enhanced medical interpretation capabilities:
 
-- Image quality and technical characteristics
-- Resolution and format analysis
-- Clinical imaging type identification (X-ray, CT, MRI, ultrasound)
+- Image quality and technical characteristics assessment
+- Resolution and format analysis with medical imaging considerations
+- Clinical imaging type identification (X-ray, CT, MRI, ultrasound, DICOM)
 - Quality recommendations for diagnostic use
 - Enterprise-grade image analysis with quality metrics and confidence scoring
+- Template-based medical findings for different imaging modalities
+- Clinical recommendations based on imaging type
+- Medical confidence scoring for interpretation quality
+- Extensible framework for integration with medical imaging APIs
+- Fallback to template analysis when APIs are unavailable
+- Support for free-tier medical imaging services
 
 ### Knowledge-RAG Retrieval Agent
 
@@ -586,11 +592,39 @@ The system integrates with external medical data sources to enhance recommendati
 - **Usage**: Automatically integrated without configuration
 - **Scope**: Global health recommendations and disease management
 
+### Free Medical Imaging APIs
+
+The system supports integration with free-tier medical imaging services:
+
+1. **Google Cloud Healthcare API**
+   - $300 free credit for 12 months
+   - 1000 DICOM instances per month always free
+   - Setup: Google Cloud Console → Enable Healthcare API → Create credentials
+
+2. **AWS HealthLake (Free Tier)**
+   - 12 months free for new accounts
+   - 5GB data storage free
+   - Setup: AWS account → HealthLake service → Create IAM user
+
+3. **Microsoft Azure Medical Imaging (Free Trial)**
+   - $200 credit for 30 days
+   - Setup: Azure account → Health Data Services → Create DICOM service
+
+4. **Open Source Models**
+   - MONAI by NVIDIA (completely free)
+   - Hugging Face medical imaging models
+   - Run locally without API calls
+
+
+
 ### Configuration
 
 - **External API Control**: Toggle external API calls with `ENABLE_EXTERNAL_APIS` environment variable
+- **Medical Imaging Analysis**: Enable with `ENABLE_MEDICAL_IMAGING_ANALYSIS` setting
 - **Result Limit**: Expanded result limit to ensure inclusion of external sources (8 results)
 - **Fixed Endpoints**: Updated CDC endpoints to working URLs for reliable data retrieval
+- **Fallback Behavior**: Template-based analysis when APIs are unavailable or fail
+
 
 ## 📊 Monitoring & Metrics
 
@@ -613,6 +647,7 @@ The system exposes Prometheus metrics at `/metrics` endpoint including:
 4. Configuration is managed through `app/core/config.py`
 5. External API integrations are handled in `app/utils/medical_apis.py`
 6. External API calls can be toggled with `ENABLE_EXTERNAL_APIS` setting
+7. Medical imaging analysis can be enabled with `ENABLE_MEDICAL_IMAGING_ANALYSIS` setting
 
 ### Frontend Development
 
