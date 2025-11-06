@@ -93,18 +93,50 @@ export const getPredictiveAnalytics = (requestData) => {
 }
 
 export const getClinicalVisualization = (requestData) => {
-  console.log('Sending clinical visualization request:', requestData);
-  return apiClient.post('/api/agents/clinical-visualization', requestData)
-    .then(response => {
-      console.log('Received clinical visualization response:', response.data);
-      return response;
-    })
-    .catch(error => {
-      console.error('Error in clinical visualization request:', error);
-      throw error;
-    });
+  return apiClient.post('/api/agents/clinical-visualization', requestData);
 }
 
 export const getDifferentialDiagnosis = (requestData) => {
   return apiClient.post('/api/agents/differential-diagnosis', requestData);
+}
+
+// IoT Data Endpoint
+export const getIoTVitalsData = (requestData) => {
+  console.log('Sending IoT vitals data request:', requestData);
+  return apiClient.post('/api/iot-vitals', requestData)
+    .then(response => {
+      console.log('Received IoT vitals data response:', response.data);
+      return response;
+    })
+    .catch(error => {
+      console.error('Error in IoT vitals data request:', error);
+      throw error;
+    });
+}
+
+// Clinician Review Endpoints
+export const saveClinicianReview = (reviewData) => {
+  console.log('Saving clinician review:', reviewData);
+  return apiClient.post('/api/clinician-review', reviewData)
+    .then(response => {
+      console.log('Clinician review saved:', response.data);
+      return response;
+    })
+    .catch(error => {
+      console.error('Error saving clinician review:', error);
+      throw error;
+    });
+}
+
+export const getClinicianReview = (taskId) => {
+  console.log('Fetching clinician review for task:', taskId);
+  return apiClient.get(`/api/clinician-review/${taskId}`)
+    .then(response => {
+      console.log('Received clinician review:', response.data);
+      return response;
+    })
+    .catch(error => {
+      console.error('Error fetching clinician review:', error);
+      throw error;
+    });
 }

@@ -14,6 +14,9 @@ This project is an AI-powered, agentic healthcare decision-support system that p
 - **Treatment Optimization:** Personalized treatment recommendations with cost-effectiveness analysis
 - **Enhanced Clinical Visualizations:** Interactive charts and visual representations of clinical data with improved data accuracy
 - **Comprehensive Metrics Dashboard:** Real-time system performance monitoring with latency tracking and Prometheus integration
+- **IoT Data Integration:** Simulated IoT medical device data for continuous patient monitoring
+- **Enterprise-Grade Medical Imaging Analysis:** Advanced image analysis with quality metrics and technical assessment
+- **Human-in-the-Loop Review:** Clinician approval and modification of AI recommendations
 - **Monitoring & Metrics:** Prometheus endpoint for system monitoring
 - **Modern UI/UX:** React-based dashboard with Tailwind CSS styling
 
@@ -361,6 +364,22 @@ The Docker setup maintains full compatibility with the manual setup, so you can 
 - `POST /api/upload` - Uploads a medical image file
 - `GET /api/results/{task_id}` - Retrieves the result of a triage task
 
+### IoT Data Endpoints
+
+- `POST /api/iot-vitals` - Simulates IoT vital signs data for patient monitoring
+
+  ```json
+  {
+    "condition": "chest_pain", // Optional: specific medical condition to simulate
+    "duration_seconds": 60     // Optional: stream data over time (0 for single reading)
+  }
+  ```
+
+### Clinician Review Endpoints
+
+- `POST /api/clinician-review` - Save clinician review and approval of AI recommendations
+- `GET /api/clinician-review/{task_id}` - Retrieve clinician review for a specific task
+
 ### Database Endpoints
 
 - `GET /api/initdb` - Initializes the ChromaDB with sample clinical guidelines
@@ -401,6 +420,7 @@ Analyzes medical images using rule-based logic to assess:
 - Resolution and format analysis
 - Clinical imaging type identification (X-ray, CT, MRI, ultrasound)
 - Quality recommendations for diagnostic use
+- Enterprise-grade image analysis with quality metrics and confidence scoring
 
 ### Knowledge-RAG Retrieval Agent
 

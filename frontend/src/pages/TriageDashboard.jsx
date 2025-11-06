@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaUpload, FaSpinner } from "react-icons/fa";
-import { startTriage, uploadImage } from "../api";
+import { FaUpload, FaSpinner, FaSync } from "react-icons/fa";
+import { startTriage, uploadImage, getIoTVitalsData } from "../api";
 
 const TriageDashboard = () => {
   const [formData, setFormData] = useState({
@@ -14,6 +14,8 @@ const TriageDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [file, setFile] = useState(null);
+  const [iotLoading, setIotLoading] = useState(false);
+  const [iotSuccess, setIotSuccess] = useState(false);
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -68,6 +70,51 @@ const TriageDashboard = () => {
     }
   };
 
+  const handlePullIoTData = async () => {
+    setIotLoading(true);
+    setError(null);
+    setIotSuccess(false);
+    
+    try {
+      // Call the IoT endpoint to get real data
+      const response = await getIoTVitalsData({});
+      
+      console.log('IoT API Response:', response);
+      
+      if (response && response.data && response.data.status === "success") {
+        const vitalsData = response.data.data;
+        
+        // Update the form data with the IoT data
+        // Log the vitals data for debugging
+        console.log('IoT Vitals Data:', vitalsData);
+        
+        setFormData(prev => ({
+          ...prev,
+          vitals: {
+            heart_rate: vitalsData.heart_rate || prev.vitals.heart_rate || "",
+            blood_pressure: vitalsData.blood_pressure || prev.vitals.blood_pressure || "",
+            temperature: vitalsData.temperature || prev.vitals.temperature || "",
+            // Note: oxygen_saturation and respiratory_rate are not in the form fields
+            // but we'll keep them in case they're added later
+          }
+        }));
+        
+        // Show success message
+        setIotSuccess(true);
+        // Also show an alert for better visibility
+        console.log('IoT data successfully pulled and form updated');
+        setTimeout(() => setIotSuccess(false), 3000); // Hide after 3 seconds
+      } else {
+        throw new Error("Invalid response from IoT data endpoint");
+      }
+    } catch (err) {
+      console.error("Error pulling IoT data:", err);
+      setError("Failed to pull IoT data. Please try again.");
+    } finally {
+      setIotLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
@@ -106,7 +153,29 @@ const TriageDashboard = () => {
 
             {/* Vitals */}
             <div className="form-group">
-              <h3 className="h3 text-neutral-text mb-4">Vital Signs</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="h3 text-neutral-text">Vital Signs</h3>
+                <div className="flex items-center space-x-2">
+                  {iotSuccess && (
+                    <span className="text-success text-sm font-medium">
+                      IoT data pulled successfully!
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handlePullIoTData}
+                    disabled={iotLoading}
+                    className="btn btn-secondary btn-sm flex items-center"
+                  >
+                    {iotLoading ? (
+                      <FaSpinner className="animate-spin mr-2" />
+                    ) : (
+                      <FaSync className="mr-2" />
+                    )}
+                    Pull IoT Data
+                  </button>
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <label htmlFor="heart_rate" className="form-label">

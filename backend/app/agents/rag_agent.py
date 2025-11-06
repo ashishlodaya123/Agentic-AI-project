@@ -106,9 +106,9 @@ class KnowledgeRAGAgent:
         Retrieve data from external medical sources with fallback.
         """
         external_data = {
-            "medline": search_medline(query),
-            "cdc": get_cdc_data(query),
-            "who": get_who_data(query)
+            "medline": {"status": "skipped", "message": "External API calls disabled for performance"},
+            "cdc": {"status": "skipped", "message": "External API calls disabled for performance"},
+            "who": {"status": "skipped", "message": "External API calls disabled for performance"}
         }
         return external_data
 

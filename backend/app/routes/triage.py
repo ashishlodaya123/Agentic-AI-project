@@ -1,11 +1,12 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel
+from typing import Optional, Dict, Any
 from app.tasks import process_triage_request
 from celery.result import AsyncResult
 from prometheus_client import Counter
 import os
 import uuid
+from app.utils.iot_simulator import get_iot_vitals_data, stream_iot_vitals_data
 
 router = APIRouter()
 
@@ -14,11 +15,25 @@ TRIAGE_REQUESTS = Counter("triage_requests_total", "Total Triage Requests", ["st
 
 # --- Pydantic Models ---
 class PatientData(BaseModel):
-    symptoms: str = Field(..., example="Patient complains of chest pain and shortness of breath.")
-    vitals: dict = Field(..., example={"heart_rate": 110, "blood_pressure": "140/90", "temperature": 37.8})
-    age: int = Field(..., example=58)
-    gender: str = Field(..., example="Male")
+    symptoms: str
+    vitals: Dict[str, Any]
+    age: int
+    gender: str
     image_path: Optional[str] = None
+
+class IoTDataRequest(BaseModel):
+    condition: Optional[str] = None
+    duration_seconds: Optional[int] = 60
+
+class ClinicianReview(BaseModel):
+    task_id: str
+    approved: bool
+    notes: Optional[str] = None
+    override_recommendations: Optional[bool] = False
+    modified_urgency: Optional[str] = None
+
+# In-memory storage for clinician reviews (in production, this would be a database)
+clinician_reviews = {}
 
 # --- Triage Endpoint ---
 @router.post("/triage")
@@ -27,11 +42,61 @@ async def run_triage(patient_data: PatientData):
     Accepts patient data and initiates the triage process.
     """
     try:
-        task = process_triage_request.delay(patient_data.dict())
+        # Using apply_async instead of delay to avoid type checking issues
+        task = process_triage_request.apply_async(args=[patient_data.dict()])
         TRIAGE_REQUESTS.labels(status="started").inc()
         return {"task_id": task.id, "status": "Triage process started"}
     except Exception as e:
         TRIAGE_REQUESTS.labels(status="failed").inc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- IoT Data Endpoint ---
+@router.post("/iot-vitals")
+async def get_iot_vitals_data_endpoint(request: IoTDataRequest):
+    """
+    Simulates IoT vital signs data for patient monitoring.
+    """
+    try:
+        if request.duration_seconds and request.duration_seconds > 0:
+            # Stream data over time
+            vitals_data = stream_iot_vitals_data(request.duration_seconds)
+            return {"status": "success", "data": vitals_data, "message": f"Streamed {len(vitals_data)} vital signs readings"}
+        else:
+            # Single data point
+            # Handle the case where condition might be None
+            if request.condition:
+                vitals_data = get_iot_vitals_data(request.condition)
+            else:
+                vitals_data = get_iot_vitals_data()
+            return {"status": "success", "data": vitals_data, "message": "Vital signs data generated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Clinician Review Endpoints ---
+@router.post("/clinician-review")
+async def save_clinician_review(review: ClinicianReview):
+    """
+    Save clinician review and approval of AI recommendations.
+    """
+    try:
+        # Store the review in memory (in production, this would go to a database)
+        clinician_reviews[review.task_id] = review.dict()
+        return {"status": "success", "message": "Review saved successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/clinician-review/{task_id}")
+async def get_clinician_review(task_id: str):
+    """
+    Retrieve clinician review for a specific task.
+    """
+    try:
+        review = clinician_reviews.get(task_id)
+        if review:
+            return {"status": "success", "data": review}
+        else:
+            return {"status": "not_found", "message": "No review found for this task"}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- Image Upload Endpoint ---
@@ -45,7 +110,8 @@ async def upload_image(file: UploadFile = File(...)):
     Uploads a medical image and returns the file path.
     """
     try:
-        file_extension = os.path.splitext(file.filename)[1]
+        filename = file.filename or "unknown"
+        file_extension = os.path.splitext(filename)[1]
         file_name = f"{uuid.uuid4()}{file_extension}"
         file_path = os.path.join(UPLOAD_DIRECTORY, file_name)
 
@@ -62,7 +128,7 @@ async def get_triage_result(task_id: str):
     """
     Retrieves the result of a triage task.
     """
-    task_result = AsyncResult(task_id, app=process_triage_request.app)
+    task_result = AsyncResult(task_id)
 
     if task_result.state == 'PENDING':
         return {"status": "Pending"}

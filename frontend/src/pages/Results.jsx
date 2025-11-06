@@ -24,9 +24,13 @@ import {
   FaClipboardCheck,
   FaBrain,
   FaChartArea,
+  FaEdit,
+  FaSave,
+  FaLock,
+  FaLockOpen
 } from "react-icons/fa";
 import { motion } from "framer-motion";
-import { getTaskResult } from "../api";
+import { getTaskResult, saveClinicianReview, getClinicianReview } from "../api";
 import AdvancedAgentResults from "../components/AdvancedAgentResults";
 import ClinicalVisualizations from "../components/ClinicalVisualizations";
 import DifferentialDiagnosis from "../components/DifferentialDiagnosis";
@@ -38,6 +42,14 @@ const Results = () => {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [clinicianReview, setClinicianReview] = useState({
+    approved: false,
+    notes: "",
+    overrideRecommendations: false,
+    modifiedUrgency: ""
+  });
+  const [isEditing, setIsEditing] = useState(false);
+  const [reviewLoading, setReviewLoading] = useState(false);
 
   useEffect(() => {
     // Try to load cached result first
@@ -86,8 +98,28 @@ const Results = () => {
         });
     }, 2000); // Poll every 2 seconds
 
+    // Load clinician review if it exists
+    loadClinicianReview();
+
     return () => clearInterval(pollResult);
   }, [taskId]);
+
+  const loadClinicianReview = async () => {
+    try {
+      const response = await getClinicianReview(taskId);
+      if (response.data.status === "success" && response.data.data) {
+        const reviewData = response.data.data;
+        setClinicianReview({
+          approved: reviewData.approved || false,
+          notes: reviewData.notes || "",
+          overrideRecommendations: reviewData.override_recommendations || false,
+          modifiedUrgency: reviewData.modified_urgency || ""
+        });
+      }
+    } catch (err) {
+      console.log("No existing clinician review found");
+    }
+  };
 
   const handleStartNewTriage = () => {
     navigate("/triage");
@@ -95,6 +127,51 @@ const Results = () => {
 
   const handlePrintReport = () => {
     window.print();
+  };
+
+  const handleApproveRecommendations = () => {
+    setClinicianReview(prev => ({
+      ...prev,
+      approved: true
+    }));
+  };
+
+  const handleRejectRecommendations = () => {
+    setClinicianReview(prev => ({
+      ...prev,
+      approved: false
+    }));
+  };
+
+  const handleSaveReview = async () => {
+    setReviewLoading(true);
+    try {
+      const reviewData = {
+        task_id: taskId,
+        approved: clinicianReview.approved,
+        notes: clinicianReview.notes,
+        override_recommendations: clinicianReview.overrideRecommendations,
+        modified_urgency: clinicianReview.modifiedUrgency
+      };
+
+      const response = await saveClinicianReview(reviewData);
+      
+      if (response.data.status === "success") {
+        setIsEditing(false);
+        alert("Review saved successfully!");
+      } else {
+        throw new Error(response.data.message || "Failed to save review");
+      }
+    } catch (err) {
+      console.error("Error saving clinician review:", err);
+      alert("Failed to save review. Please try again.");
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
+  const handleEditReview = () => {
+    setIsEditing(true);
   };
 
   if (loading) {
@@ -512,6 +589,158 @@ const Results = () => {
         </div>
       </div>
 
+      {/* Human-in-the-Loop Review Section */}
+      <div className="card mb-8">
+        <div className="card-header">
+          <div className="flex items-center">
+            <div className="bg-purple-100 p-2 rounded-lg mr-3">
+              <FaUserMd className="h-5 w-5 text-purple-600" />
+            </div>
+            <h3 className="h3 text-neutral-text">Clinician Review & Approval</h3>
+          </div>
+        </div>
+        <div className="card-body">
+          {isEditing ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-neutral-text">
+                  Review Recommendations
+                </h4>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setClinicianReview(prev => ({ ...prev, approved: true }))}
+                    className={`btn ${clinicianReview.approved ? 'btn-success' : 'btn-outline'}`}
+                  >
+                    <FaCheck className="mr-2" />
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => setClinicianReview(prev => ({ ...prev, approved: false }))}
+                    className={`btn ${!clinicianReview.approved ? 'btn-error' : 'btn-outline'}`}
+                  >
+                    <FaTimes className="mr-2" />
+                    Reject
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">Review Notes</label>
+                <textarea
+                  className="form-control"
+                  rows="4"
+                  value={clinicianReview.notes}
+                  onChange={(e) => setClinicianReview(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Add your clinical notes and observations here..."
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label">Override Urgency Level</label>
+                  <select
+                    className="form-control"
+                    value={clinicianReview.modifiedUrgency}
+                    onChange={(e) => setClinicianReview(prev => ({ ...prev, modifiedUrgency: e.target.value }))}
+                  >
+                    <option value="">Keep AI Recommendation</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="moderate">Moderate</option>
+                    <option value="low">Low</option>
+                    <option value="minimal">Minimal</option>
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      className="form-checkbox"
+                      checked={clinicianReview.overrideRecommendations}
+                      onChange={(e) => setClinicianReview(prev => ({ ...prev, overrideRecommendations: e.target.checked }))}
+                    />
+                    <span className="ml-2">Override AI Recommendations</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <button
+                  onClick={() => setIsEditing(false)}
+                  className="btn btn-secondary"
+                  disabled={reviewLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveReview}
+                  className="btn btn-primary"
+                  disabled={reviewLoading}
+                >
+                  {reviewLoading ? (
+                    <FaSpinner className="animate-spin mr-2" />
+                  ) : (
+                    <FaSave className="mr-2" />
+                  )}
+                  Save Review
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium text-neutral-text">
+                    Clinical Review Status
+                  </h4>
+                  <p className="body-small text-neutral-text-secondary">
+                    Reviewed and approved by healthcare professional
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  {clinicianReview.approved ? (
+                    <span className="badge badge-success flex items-center">
+                      <FaLock className="mr-1" />
+                      Approved
+                    </span>
+                  ) : (
+                    <span className="badge badge-warning flex items-center">
+                      <FaLockOpen className="mr-1" />
+                      Pending Review
+                    </span>
+                  )}
+                  <button
+                    onClick={handleEditReview}
+                    className="btn btn-secondary btn-sm"
+                  >
+                    <FaEdit className="mr-1" />
+                    Edit Review
+                  </button>
+                </div>
+              </div>
+
+              {clinicianReview.notes && (
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <h5 className="font-medium text-neutral-text mb-2">Review Notes</h5>
+                  <p className="body-small text-neutral-text-secondary">
+                    {clinicianReview.notes}
+                  </p>
+                </div>
+              )}
+
+              {clinicianReview.modifiedUrgency && (
+                <div className="p-4 bg-amber-50 rounded-lg">
+                  <h5 className="font-medium text-neutral-text mb-2">Modified Urgency</h5>
+                  <p className="body-small text-neutral-text-secondary">
+                    Urgency level changed to: <span className="font-medium">{clinicianReview.modifiedUrgency}</span>
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Detailed Analysis */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Symptoms & Vitals Analysis */}
@@ -837,7 +1066,7 @@ const Results = () => {
                         Format
                       </span>
                       <span className="font-medium text-neutral-text">
-                        {imagingAnalysis.analysis?.color_format}
+                        {imagingAnalysis.analysis?.file_format}
                       </span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-neutral-border">
@@ -902,6 +1131,48 @@ const Results = () => {
                   </div>
                 </div>
               </div>
+              
+              {/* Enterprise Image Analysis */}
+              {imagingAnalysis.analysis?.image_statistics && (
+                <div className="mt-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                  <h4 className="font-medium text-neutral-text mb-3">
+                    Enterprise Image Analysis
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <h5 className="font-medium text-neutral-text text-sm">
+                        Image Statistics
+                      </h5>
+                      <pre className="text-xs text-neutral-text-secondary bg-white p-2 rounded mt-1 overflow-x-auto">
+                        {JSON.stringify(imagingAnalysis.analysis.image_statistics, null, 2)}
+                      </pre>
+                    </div>
+                    <div>
+                      <h5 className="font-medium text-neutral-text text-sm">
+                        Quality Metrics
+                      </h5>
+                      <pre className="text-xs text-neutral-text-secondary bg-white p-2 rounded mt-1 overflow-x-auto">
+                        {JSON.stringify(imagingAnalysis.analysis.quality_metrics, null, 2)}
+                      </pre>
+                    </div>
+                    <div>
+                      <h5 className="font-medium text-neutral-text text-sm">
+                        Confidence
+                      </h5>
+                      <div className="mt-1">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-neutral-text-secondary">
+                            Analysis Confidence
+                          </span>
+                          <span className="font-medium">
+                            {(imagingAnalysis.analysis.enterprise_confidence * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="prose max-w-none">
