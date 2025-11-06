@@ -503,11 +503,14 @@ Reviews all recommendations for consistency and completeness:
 
 Generates ranked differential diagnoses based on symptoms and vitals with enhanced accuracy:
 
-- Expanded database of common medical conditions with symptom profiles
-- Improved matching algorithm based on symptom overlap and direct symptom consideration
-- Demographic adjustments for age and gender
-- Medical history consideration for risk factors
-- Confidence scoring for each differential
+- Expanded database of common medical conditions with symptom profiles (13+ conditions)
+- Improved matching algorithm with weighted scoring and fuzzy matching capabilities
+- Demographic adjustments for age and gender with age-appropriate condition filtering
+- Medical history consideration for risk factors with higher impact scoring
+- Confidence scoring for each differential based on match quality
+- Better utilization of structured symptoms analysis data
+- Enhanced vital sign indicator monitoring with more comprehensive checks
+- Limited to top 4 most relevant diagnoses for focused clinical decision-making
 
 ### Predictive Analytics Agent
 
@@ -551,6 +554,13 @@ Each guideline includes:
 - Diagnostic criteria
 - Management strategies
 
+The Knowledge-RAG Retrieval Agent has been enhanced with:
+
+- Improved result ranking and filtering
+- Metadata-based document categorization
+- Better relevance scoring algorithms
+- Expanded result limit (8 results) to ensure inclusion of external sources
+
 ## 🔗 External Medical Data Integration
 
 The system integrates with external medical data sources to enhance recommendations:
@@ -576,6 +586,12 @@ The system integrates with external medical data sources to enhance recommendati
 - **Usage**: Automatically integrated without configuration
 - **Scope**: Global health recommendations and disease management
 
+### Configuration
+
+- **External API Control**: Toggle external API calls with `ENABLE_EXTERNAL_APIS` environment variable
+- **Result Limit**: Expanded result limit to ensure inclusion of external sources (8 results)
+- **Fixed Endpoints**: Updated CDC endpoints to working URLs for reliable data retrieval
+
 ## 📊 Monitoring & Metrics
 
 The system exposes Prometheus metrics at `/metrics` endpoint including:
@@ -596,6 +612,7 @@ The system exposes Prometheus metrics at `/metrics` endpoint including:
 3. Celery tasks are defined in `app/tasks.py`
 4. Configuration is managed through `app/core/config.py`
 5. External API integrations are handled in `app/utils/medical_apis.py`
+6. External API calls can be toggled with `ENABLE_EXTERNAL_APIS` setting
 
 ### Frontend Development
 
