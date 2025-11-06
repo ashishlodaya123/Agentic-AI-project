@@ -19,6 +19,11 @@ const ClinicalVisualizations = ({ taskId, patientData, symptomsAnalysis, riskAss
       setLoading(true);
       setError(null);
       
+      // Debug: Log the data being sent
+      console.log('Patient Data being sent:', patientData);
+      console.log('Symptoms Analysis being sent:', symptomsAnalysis);
+      console.log('Risk Assessment being sent:', riskAssessment);
+      
       try {
         const requestData = {
           patient_data: patientData,
@@ -31,7 +36,9 @@ const ClinicalVisualizations = ({ taskId, patientData, symptomsAnalysis, riskAss
         };
         
         const response = await getClinicalVisualization(requestData);
+        console.log('Clinical Visualization Response:', response);
         if (response.data?.success) {
+          console.log('Visualization Data:', response.data.data);
           setVisualizationData(response.data.data);
         } else {
           setError('Failed to fetch visualization data');
@@ -49,7 +56,27 @@ const ClinicalVisualizations = ({ taskId, patientData, symptomsAnalysis, riskAss
 
   // Render vital signs chart
   const renderVitalSignsChart = (vitalData) => {
-    if (!vitalData || vitalData.data.length === 0) return null;
+    console.log('Vital Signs Data:', vitalData); // Debug log
+    if (!vitalData || !vitalData.data || vitalData.data.length === 0) {
+      return (
+        <div className="card">
+          <div className="card-header">
+            <div className="flex items-center">
+              <div className="bg-red-100 p-2 rounded-lg mr-3">
+                <FaHeartbeat className="h-5 w-5 text-red-600" />
+              </div>
+              <h3 className="h3 text-neutral-text">Vital Signs Overview</h3>
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="text-center py-8 text-neutral-text-secondary">
+              <FaHeartbeat className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+              <p>No vital signs data available for visualization.</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="card">
@@ -106,7 +133,27 @@ const ClinicalVisualizations = ({ taskId, patientData, symptomsAnalysis, riskAss
 
   // Render risk stratification chart
   const renderRiskChart = (riskData) => {
-    if (!riskData || !riskData.risk_factors || riskData.risk_factors.length === 0) return null;
+    console.log('Risk Data:', riskData); // Debug log
+    if (!riskData || !riskData.risk_factors || riskData.risk_factors.length === 0) {
+      return (
+        <div className="card">
+          <div className="card-header">
+            <div className="flex items-center">
+              <div className="bg-amber-100 p-2 rounded-lg mr-3">
+                <FaExclamationTriangle className="h-5 w-5 text-amber-600" />
+              </div>
+              <h3 className="h3 text-neutral-text">Risk Stratification Analysis</h3>
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="text-center py-8 text-neutral-text-secondary">
+              <FaExclamationTriangle className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+              <p>No risk factors data available for visualization.</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="card">
@@ -141,7 +188,7 @@ const ClinicalVisualizations = ({ taskId, patientData, symptomsAnalysis, riskAss
                 <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
                   <div 
                     className="h-2 rounded-full bg-primary"
-                    style={{ width: `${factor.weight * 100}%` }}
+                    style={{ width: `${Math.min(100, factor.weight * 100)}%` }}
                   ></div>
                 </div>
               </div>
@@ -154,7 +201,26 @@ const ClinicalVisualizations = ({ taskId, patientData, symptomsAnalysis, riskAss
 
   // Render treatment timeline
   const renderTreatmentTimeline = (timelineData) => {
-    if (!timelineData || !timelineData.events || timelineData.events.length === 0) return null;
+    if (!timelineData || !timelineData.events || timelineData.events.length === 0) {
+      return (
+        <div className="card">
+          <div className="card-header">
+            <div className="flex items-center">
+              <div className="bg-green-100 p-2 rounded-lg mr-3">
+                <FaCalendarAlt className="h-5 w-5 text-green-600" />
+              </div>
+              <h3 className="h3 text-neutral-text">Treatment and Follow-up Timeline</h3>
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="text-center py-8 text-neutral-text-secondary">
+              <FaCalendarAlt className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+              <p>No treatment timeline data available for visualization.</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     // Group events by time
     const groupedEvents = timelineData.events.reduce((acc, event) => {
@@ -213,7 +279,26 @@ const ClinicalVisualizations = ({ taskId, patientData, symptomsAnalysis, riskAss
 
   // Render symptom distribution chart
   const renderSymptomChart = (symptomData) => {
-    if (!symptomData || !symptomData.symptoms || symptomData.symptoms.length === 0) return null;
+    if (!symptomData || !symptomData.symptoms || symptomData.symptoms.length === 0) {
+      return (
+        <div className="card">
+          <div className="card-header">
+            <div className="flex items-center">
+              <div className="bg-purple-100 p-2 rounded-lg mr-3">
+                <FaChartPie className="h-5 w-5 text-purple-600" />
+              </div>
+              <h3 className="h3 text-neutral-text">Symptom Distribution by System</h3>
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="text-center py-8 text-neutral-text-secondary">
+              <FaChartPie className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+              <p>No symptom data available for visualization.</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     // Calculate total symptoms
     const totalSymptoms = symptomData.symptoms.reduce((sum, item) => sum + item.count, 0);
@@ -295,7 +380,26 @@ const ClinicalVisualizations = ({ taskId, patientData, symptomsAnalysis, riskAss
 
   // Render patient summary
   const renderPatientSummary = (summaryData) => {
-    if (!summaryData) return null;
+    if (!summaryData) {
+      return (
+        <div className="card">
+          <div className="card-header">
+            <div className="flex items-center">
+              <div className="bg-blue-100 p-2 rounded-lg mr-3">
+                <FaUserMd className="h-5 w-5 text-blue-600" />
+              </div>
+              <h3 className="h3 text-neutral-text">Patient Summary</h3>
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="text-center py-8 text-neutral-text-secondary">
+              <FaUserMd className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+              <p>No patient summary data available.</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="card">
@@ -326,6 +430,29 @@ const ClinicalVisualizations = ({ taskId, patientData, symptomsAnalysis, riskAss
               <div className="text-neutral-text mt-1">{summaryData.chief_complaint}</div>
             </div>
           </div>
+          
+          {/* Additional patient information */}
+          {summaryData.key_symptoms && summaryData.key_symptoms.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-neutral-border">
+              <h4 className="font-medium text-neutral-text mb-2">Key Symptoms</h4>
+              <div className="flex flex-wrap gap-1">
+                {summaryData.key_symptoms.map((symptom, index) => (
+                  <span key={index} className="badge badge-info text-xs">
+                    {symptom}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {summaryData.vital_signs_summary && summaryData.vital_signs_summary !== "Not recorded" && (
+            <div className="mt-3">
+              <h4 className="font-medium text-neutral-text mb-1">Vital Signs</h4>
+              <div className="body-small text-neutral-text-secondary">
+                {summaryData.vital_signs_summary}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );

@@ -33,6 +33,8 @@ class ClinicalVisualizationAgent:
         """
         try:
             logger.info("Generating clinical visualization data")
+            logger.info(f"Patient data received: {patient_data}")
+            logger.info(f"Risk assessment received: {risk_assessment}")
             
             # Generate various visualization datasets
             vital_signs_data = self._generate_vital_signs_visualization(patient_data)
@@ -46,10 +48,11 @@ class ClinicalVisualizationAgent:
                 "treatment_timeline": treatment_timeline_data,
                 "symptom_progression": symptom_progression_data,
                 "timestamp": datetime.now().isoformat(),
-                "patient_summary": self._generate_patient_summary(patient_data)
+                "patient_summary": self._generate_patient_summary(patient_data, symptoms_analysis)
             }
             
             logger.info("Generated clinical visualization data")
+            logger.info(f"Generated result: {result}")
             return result
             
         except Exception as e:
@@ -61,7 +64,8 @@ class ClinicalVisualizationAgent:
     
     def _generate_vital_signs_visualization(self, patient_data: dict) -> Dict[str, Any]:
         """Generate data for vital signs visualization."""
-        vitals = patient_data.get("vital_signs", {})
+        # Check both 'vital_signs' and 'vitals' keys for compatibility
+        vitals = patient_data.get("vital_signs", {}) or patient_data.get("vitals", {})
         
         # Convert vital signs to chart-friendly format
         vital_data = []
@@ -171,24 +175,61 @@ class ClinicalVisualizationAgent:
     
     def _generate_risk_visualization(self, risk_assessment: dict) -> Dict[str, Any]:
         """Generate data for risk stratification visualization."""
-        risk_factors = risk_assessment.get("risk_factors", [])
+        logger.info(f"Processing risk assessment: {risk_assessment}")
+        
+        # Extract risk factors from the risk assessment
+        risk_factors = []
         risk_score = risk_assessment.get("risk_score", 0)
         triage_recommendation = risk_assessment.get("triage_recommendation", {})
         
-        # Create risk factor data
-        risk_data = []
-        for factor in risk_factors:
-            risk_data.append({
-                "factor": factor.get("name", "Unknown"),
-                "weight": factor.get("weight", 0),
-                "description": factor.get("description", "")
-            })
+        # Extract vital risks
+        vital_risks = risk_assessment.get("vital_risks", {})
+        if vital_risks:
+            critical_vitals = vital_risks.get("critical_vitals", [])
+            overall_vital_risk = vital_risks.get("overall_vital_risk", 0)
+            for vital in critical_vitals:
+                risk_factors.append({
+                    "factor": vital,
+                    "weight": overall_vital_risk,
+                    "description": f"Critical vital sign: {vital}"
+                })
+        
+        # Extract symptom risks
+        symptom_risks = risk_assessment.get("symptom_risks", {})
+        if symptom_risks:
+            identified_symptoms = symptom_risks.get("identified_symptoms", [])
+            for symptom in identified_symptoms:
+                risk_factors.append({
+                    "factor": symptom.get("symptom", "Unknown Symptom"),
+                    "weight": symptom.get("risk_contribution", 0),
+                    "description": f"{symptom.get('severity', 'unknown').title()} symptom risk"
+                })
+        
+        # Extract demographic risks
+        demographic_risks = risk_assessment.get("demographic_risks", {})
+        if demographic_risks:
+            age_risk = demographic_risks.get("age_risk", 0)
+            gender_risk = demographic_risks.get("gender_risk", 0)
+            if age_risk > 0:
+                risk_factors.append({
+                    "factor": "Age-related risk",
+                    "weight": age_risk,
+                    "description": "Risk associated with patient age"
+                })
+            if gender_risk > 0:
+                risk_factors.append({
+                    "factor": "Gender-related risk",
+                    "weight": gender_risk,
+                    "description": "Risk associated with patient gender"
+                })
         
         # Sort by weight (highest first)
-        risk_data.sort(key=lambda x: x["weight"], reverse=True)
+        risk_factors.sort(key=lambda x: x["weight"], reverse=True)
+        
+        logger.info(f"Generated risk factors: {risk_factors}")
         
         return {
-            "risk_factors": risk_data,
+            "risk_factors": risk_factors,
             "risk_score": risk_score,
             "urgency_level": triage_recommendation.get("urgency", "Unknown"),
             "chart_type": "bar",
@@ -266,6 +307,9 @@ class ClinicalVisualizationAgent:
         categories = symptoms_analysis.get("symptom_categories", {})
         symptom_data = []
         
+        # Also consider primary concerns for a more comprehensive view
+        primary_concerns = symptoms_analysis.get("primary_concerns", [])
+        
         for category, symptoms in categories.items():
             if symptoms:
                 symptom_data.append({
@@ -274,17 +318,79 @@ class ClinicalVisualizationAgent:
                     "symptoms": symptoms
                 })
         
+        # If we don't have categorized symptoms, try to create categories from primary concerns
+        if not symptom_data and primary_concerns:
+            # Group concerns by type if possible
+            concern_types = {}
+            for concern in primary_concerns:
+                concern_type = concern.get("type", "General")
+                if concern_type not in concern_types:
+                    concern_types[concern_type] = []
+                concern_name = concern.get("name", concern.get("condition", "Unknown"))
+                concern_types[concern_type].append(concern_name)
+            
+            for concern_type, concerns in concern_types.items():
+                symptom_data.append({
+                    "category": concern_type.replace("_", " ").title(),
+                    "count": len(concerns),
+                    "symptoms": concerns
+                })
+        
         return {
             "symptoms": symptom_data,
             "chart_type": "pie",
             "title": "Symptom Distribution by System"
         }
     
-    def _generate_patient_summary(self, patient_data: dict) -> Dict[str, Any]:
-        """Generate patient summary information."""
+    def _generate_patient_summary(self, patient_data: dict, symptoms_analysis: dict) -> Dict[str, Any]:
+        """Generate patient summary information with more detailed data."""
+        # Get basic patient info
+        age = patient_data.get("age", "N/A")
+        gender = patient_data.get("gender", "N/A")
+        chief_complaint = patient_data.get("chief_complaint", "N/A")
+        
+        # Truncate long chief complaints
+        if len(chief_complaint) > 50:
+            chief_complaint = chief_complaint[:50] + "..."
+        
+        # Get medical history count
+        medical_history = patient_data.get("medical_history", [])
+        medical_history_count = len(medical_history)
+        
+        # Extract key symptoms from analysis
+        key_symptoms = []
+        if symptoms_analysis:
+            # Try to get symptoms from categories
+            categories = symptoms_analysis.get("symptom_categories", {})
+            for category, symptoms in categories.items():
+                key_symptoms.extend(symptoms)
+            
+            # If no categorized symptoms, try primary concerns
+            if not key_symptoms:
+                primary_concerns = symptoms_analysis.get("primary_concerns", [])
+                for concern in primary_concerns:
+                    concern_name = concern.get("name", concern.get("condition", ""))
+                    if concern_name:
+                        key_symptoms.append(concern_name)
+        
+        # Get vital signs summary
+        vital_signs = patient_data.get("vital_signs", {})
+        vital_summary = []
+        if vital_signs:
+            if "blood_pressure" in vital_signs:
+                vital_summary.append(f"BP: {vital_signs['blood_pressure']}")
+            if "heart_rate" in vital_signs:
+                vital_summary.append(f"HR: {vital_signs['heart_rate']} bpm")
+            if "temperature" in vital_signs:
+                vital_summary.append(f"Temp: {vital_signs['temperature']}°C")
+            if "oxygen_saturation" in vital_signs:
+                vital_summary.append(f"O2 Sat: {vital_signs['oxygen_saturation']}")
+        
         return {
-            "age": patient_data.get("age", "N/A"),
-            "gender": patient_data.get("gender", "N/A"),
-            "chief_complaint": patient_data.get("chief_complaint", "N/A")[:50] + "..." if len(patient_data.get("chief_complaint", "")) > 50 else patient_data.get("chief_complaint", "N/A"),
-            "medical_history_count": len(patient_data.get("medical_history", []))
+            "age": age,
+            "gender": gender,
+            "chief_complaint": chief_complaint,
+            "medical_history_count": medical_history_count,
+            "key_symptoms": key_symptoms[:5],  # Limit to top 5 symptoms
+            "vital_signs_summary": ", ".join(vital_summary) if vital_summary else "Not recorded"
         }

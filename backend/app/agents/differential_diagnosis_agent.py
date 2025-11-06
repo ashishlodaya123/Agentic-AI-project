@@ -14,59 +14,73 @@ class DifferentialDiagnosisAgent:
         self.condition_database = {
             "myocardial_infarction": {
                 "name": "Myocardial Infarction (Heart Attack)",
-                "symptoms": ["chest pain", "shortness of breath", "nausea", "sweating", "arm pain"],
+                "symptoms": ["chest pain", "shortness of breath", "nausea", "sweating", "arm pain", "jaw pain", "neck pain"],
                 "vital_indicators": {"high_blood_pressure": True, "rapid_heart_rate": True},
                 "prevalence": 0.8,
                 "severity": "high"
             },
             "pneumonia": {
                 "name": "Pneumonia",
-                "symptoms": ["fever", "cough", "shortness of breath", "chest pain", "fatigue"],
+                "symptoms": ["fever", "cough", "shortness of breath", "chest pain", "fatigue", "chills", "sputum production"],
                 "vital_indicators": {"fever": True, "rapid_breathing": True},
                 "prevalence": 0.7,
                 "severity": "high"
             },
             "pulmonary_embolism": {
                 "name": "Pulmonary Embolism",
-                "symptoms": ["shortness of breath", "chest pain", "cough", "leg swelling"],
+                "symptoms": ["shortness of breath", "chest pain", "cough", "leg swelling", "rapid heart rate", "fainting"],
                 "vital_indicators": {"rapid_heart_rate": True, "low_oxygen": True},
                 "prevalence": 0.6,
                 "severity": "high"
             },
             "asthma_exacerbation": {
                 "name": "Asthma Exacerbation",
-                "symptoms": ["shortness of breath", "wheezing", "chest tightness", "cough"],
+                "symptoms": ["shortness of breath", "wheezing", "chest tightness", "cough", "difficulty speaking"],
                 "vital_indicators": {"rapid_breathing": True, "low_oxygen": True},
                 "prevalence": 0.65,
                 "severity": "moderate"
             },
             "costochondritis": {
                 "name": "Costochondritis",
-                "symptoms": ["chest pain", "tenderness", "pain with breathing"],
+                "symptoms": ["chest pain", "tenderness", "pain with breathing", "pain with movement"],
                 "vital_indicators": {},
                 "prevalence": 0.5,
                 "severity": "low"
             },
             "gastroesophageal_reflux": {
                 "name": "Gastroesophageal Reflux Disease (GERD)",
-                "symptoms": ["chest pain", "heartburn", "acid reflux", "regurgitation"],
+                "symptoms": ["chest pain", "heartburn", "acid reflux", "regurgitation", "difficulty swallowing"],
                 "vital_indicators": {},
                 "prevalence": 0.7,
                 "severity": "low"
             },
             "anxiety_panic_attack": {
                 "name": "Anxiety/Panic Attack",
-                "symptoms": ["chest pain", "shortness of breath", "sweating", "dizziness", "palpitations"],
+                "symptoms": ["chest pain", "shortness of breath", "sweating", "dizziness", "palpitations", "tingling", "fear of dying"],
                 "vital_indicators": {"rapid_heart_rate": True},
                 "prevalence": 0.6,
                 "severity": "low"
             },
             "hypertensive_crisis": {
                 "name": "Hypertensive Crisis",
-                "symptoms": ["headache", "chest pain", "shortness of breath", "blurred vision"],
+                "symptoms": ["headache", "chest pain", "shortness of breath", "blurred vision", "nosebleed"],
                 "vital_indicators": {"high_blood_pressure": True},
                 "prevalence": 0.55,
                 "severity": "high"
+            },
+            "pneumothorax": {
+                "name": "Pneumothorax (Collapsed Lung)",
+                "symptoms": ["sudden chest pain", "shortness of breath", "rapid breathing", "rapid heart rate"],
+                "vital_indicators": {"rapid_breathing": True, "rapid_heart_rate": True, "low_oxygen": True},
+                "prevalence": 0.4,
+                "severity": "high"
+            },
+            "pericarditis": {
+                "name": "Pericarditis",
+                "symptoms": ["sharp chest pain", "fever", "fatigue", "shortness of breath", "pain when lying down"],
+                "vital_indicators": {"fever": True, "rapid_heart_rate": True},
+                "prevalence": 0.35,
+                "severity": "moderate"
             }
         }
     
@@ -93,7 +107,7 @@ class DifferentialDiagnosisAgent:
             medical_history = patient_data.get("medical_history", [])
             
             # Generate differential diagnosis
-            diagnosis_list = self._generate_diagnoses(symptoms, vitals, age, gender, medical_history)
+            diagnosis_list = self._generate_diagnoses(symptoms, vitals, age, gender, medical_history, symptoms_analysis)
             
             # Rank diagnoses based on match score
             ranked_diagnoses = sorted(diagnosis_list, key=lambda x: x["match_score"], reverse=True)
@@ -124,7 +138,7 @@ class DifferentialDiagnosisAgent:
                 "timestamp": datetime.now().isoformat()
             }
     
-    def _generate_diagnoses(self, symptoms: str, vitals: dict, age: int, gender: str, medical_history: List[str]) -> List[Dict[str, Any]]:
+    def _generate_diagnoses(self, symptoms: str, vitals: dict, age: int, gender: str, medical_history: List[str], symptoms_analysis: dict) -> List[Dict[str, Any]]:
         """Generate and rank possible diagnoses."""
         diagnoses = []
         
@@ -134,18 +148,51 @@ class DifferentialDiagnosisAgent:
             matched_symptoms = []
             matched_vitals = []
             
-            # Check symptom matches
+            # Check symptom matches - enhanced processing
             condition_symptoms = condition_data["symptoms"]
+            
+            # Method 1: Direct symptom matching from chief complaint
             for symptom in condition_symptoms:
                 if symptom in symptoms:
-                    match_score += 1
+                    match_score += 1.5  # Higher weight for direct matches
                     matched_symptoms.append(symptom)
+            
+            # Method 2: Check symptoms from analysis if available
+            if symptoms_analysis:
+                # Check categorized symptoms
+                categories = symptoms_analysis.get("symptom_categories", {})
+                for category, category_symptoms in categories.items():
+                    for symptom in category_symptoms:
+                        # Check if this symptom matches any condition symptom
+                        for condition_symptom in condition_symptoms:
+                            if condition_symptom in symptom.lower() or symptom.lower() in condition_symptom:
+                                # Avoid duplicate counting
+                                if condition_symptom not in matched_symptoms:
+                                    match_score += 1.2
+                                    matched_symptoms.append(condition_symptom)
+                
+                # Check primary concerns
+                primary_concerns = symptoms_analysis.get("primary_concerns", [])
+                for concern in primary_concerns:
+                    concern_name = concern.get("name", concern.get("condition", "")).lower()
+                    concern_significance = concern.get("significance", "").lower()
+                    
+                    # Check against condition symptoms
+                    for condition_symptom in condition_symptoms:
+                        if (condition_symptom in concern_name or 
+                            condition_symptom in concern_significance or
+                            concern_name in condition_symptom or
+                            concern_significance in condition_symptom):
+                            # Avoid duplicate counting
+                            if condition_symptom not in matched_symptoms:
+                                match_score += 1.0
+                                matched_symptoms.append(condition_symptom)
             
             # Check vital sign indicators
             vital_indicators = condition_data["vital_indicators"]
             for indicator, required in vital_indicators.items():
                 if required and self._check_vital_indicator(indicator, vitals):
-                    match_score += 0.5
+                    match_score += 0.8  # Increased weight for vital indicators
                     matched_vitals.append(indicator)
             
             # Adjust for age and gender factors
@@ -217,20 +264,24 @@ class DifferentialDiagnosisAgent:
         # Age-related adjustments
         if age > 65:
             # Higher risk for cardiovascular conditions
-            if condition_key in ["myocardial_infarction", "hypertensive_crisis"]:
-                adjusted_score += 0.3
+            if condition_key in ["myocardial_infarction", "hypertensive_crisis", "pericarditis"]:
+                adjusted_score += 0.5
         elif age < 18:
             # Lower risk for certain adult conditions
             if condition_key in ["hypertensive_crisis"]:
                 adjusted_score -= 0.5
+        elif 30 <= age <= 50:
+            # Higher risk for certain conditions in this age group
+            if condition_key in ["anxiety_panic_attack"]:
+                adjusted_score += 0.3
                 
         # Gender-related adjustments
         if gender.lower() == "male":
             if condition_key == "myocardial_infarction":
-                adjusted_score += 0.2
+                adjusted_score += 0.4
         elif gender.lower() == "female":
             if condition_key == "anxiety_panic_attack":
-                adjusted_score += 0.1
+                adjusted_score += 0.3
                 
         return adjusted_score
     
@@ -242,13 +293,18 @@ class DifferentialDiagnosisAgent:
             history_lower = history_item.lower()
             
             if "hypertension" in history_lower and condition_key == "hypertensive_crisis":
-                adjusted_score += 0.4
+                adjusted_score += 0.6
             elif "asthma" in history_lower and condition_key == "asthma_exacerbation":
-                adjusted_score += 0.5
+                adjusted_score += 0.7
             elif "heart" in history_lower and condition_key == "myocardial_infarction":
-                adjusted_score += 0.3
+                adjusted_score += 0.5
             elif "blood clot" in history_lower and condition_key == "pulmonary_embolism":
+                adjusted_score += 0.6
+            elif "copd" in history_lower and condition_key in ["pneumonia", "pulmonary_embolism"]:
                 adjusted_score += 0.4
+            elif "diabetes" in history_lower:
+                # Diabetics are at higher risk for various complications
+                adjusted_score += 0.2
                 
         return adjusted_score
     
@@ -257,58 +313,88 @@ class DifferentialDiagnosisAgent:
         recommendations = {
             "myocardial_infarction": [
                 "Immediate ECG monitoring",
-                "Cardiac enzyme panel",
+                "Cardiac enzyme panel (troponin levels)",
                 "IV access establishment",
-                "Nitroglycerin for chest pain relief",
+                "Nitroglycerin for chest pain relief (if BP adequate)",
                 "Aspirin 325mg chewable",
-                "Oxygen therapy if hypoxic"
+                "Oxygen therapy if hypoxic",
+                "Morphine for pain if needed",
+                "Continuous cardiac monitoring"
             ],
             "pneumonia": [
                 "Chest X-ray",
-                "Complete blood count",
-                "Sputum culture",
+                "Complete blood count with differential",
+                "Sputum culture and sensitivity",
+                "Blood cultures if febrile",
                 "Antibiotic therapy pending culture results",
-                "Oxygen therapy if hypoxic"
+                "Oxygen therapy if hypoxic",
+                "Hydration support"
             ],
             "pulmonary_embolism": [
-                "D-dimer test",
+                "D-dimer test (age-adjusted if >50)",
                 "CT pulmonary angiogram",
-                "Anticoagulation therapy",
+                "Ventilation-perfusion scan if contraindicated",
+                "Anticoagulation therapy (heparin protocol)",
                 "Oxygen therapy",
-                "IV access"
+                "IV access",
+                "Monitor for bleeding complications"
             ],
             "asthma_exacerbation": [
                 "Peak flow measurement",
                 "Albuterol nebulizer treatment",
-                "Steroid therapy",
+                "Ipratropium bromide if severe",
+                "Systemic steroid therapy",
                 "Oxygen therapy if hypoxic",
-                "Continuous monitoring"
+                "Continuous monitoring of oxygen saturation",
+                "Consider magnesium sulfate for severe cases"
             ],
             "costochondritis": [
                 "Pain management with NSAIDs",
-                "Physical examination",
+                "Physical examination for reproducible tenderness",
                 "ECG to rule out cardiac causes",
-                "Reassurance and education"
+                "Chest X-ray if trauma suspected",
+                "Reassurance and education about benign nature"
             ],
             "gastroesophageal_reflux": [
-                "Antacid therapy",
+                "Antacid therapy for immediate relief",
                 "Proton pump inhibitor trial",
                 "ECG to rule out cardiac causes",
-                "Dietary modifications"
+                "Dietary modifications (avoid trigger foods)",
+                "Elevate head of bed",
+                "Consider H. pylori testing if indicated"
             ],
             "anxiety_panic_attack": [
                 "Reassurance and calming techniques",
                 "Vital sign monitoring",
                 "ECG to rule out cardiac causes",
-                "Breathing exercises",
-                "Anxiolytic medication if indicated"
+                "Breathing exercises (paced breathing)",
+                "Anxiolytic medication if indicated (benzodiazepines)",
+                "Consider psychological support referral"
             ],
             "hypertensive_crisis": [
-                "Immediate blood pressure monitoring",
-                "IV antihypertensive therapy",
+                "Immediate blood pressure monitoring every 5-15 min",
+                "IV antihypertensive therapy (labetalol, nicardipine)",
                 "ECG monitoring",
                 "Neurological assessment",
-                "Laboratory studies (creatinine, electrolytes)"
+                "Laboratory studies (creatinine, electrolytes, BUN)",
+                "Ophthalmologic examination if visual symptoms",
+                "Consider CT head if neurological symptoms"
+            ],
+            "pneumothorax": [
+                "Chest X-ray (PA and lateral views)",
+                "Arterial blood gas analysis",
+                "Oxygen therapy",
+                "Consider chest tube placement if large",
+                "Monitor respiratory status closely",
+                "Surgical consultation for recurrent cases"
+            ],
+            "pericarditis": [
+                "ECG (look for diffuse ST elevations)",
+                "Echocardiogram to assess for effusion",
+                "Inflammatory markers (ESR, CRP)",
+                "NSAIDs for pain and inflammation",
+                "Colchicine for recurrent cases",
+                "Rule out myocardial infarction"
             ]
         }
         

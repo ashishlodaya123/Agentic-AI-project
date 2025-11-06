@@ -12,7 +12,8 @@ This project is an AI-powered, agentic healthcare decision-support system that p
 - **Agent Orchestration:** LangGraph-powered decision flow with state management
 - **Advanced Diagnostic Support:** Differential diagnosis generation and predictive analytics for complications
 - **Treatment Optimization:** Personalized treatment recommendations with cost-effectiveness analysis
-- **Clinical Visualizations:** Interactive charts and visual representations of clinical data
+- **Enhanced Clinical Visualizations:** Interactive charts and visual representations of clinical data with improved data accuracy
+- **Comprehensive Metrics Dashboard:** Real-time system performance monitoring with latency tracking and Prometheus integration
 - **Monitoring & Metrics:** Prometheus endpoint for system monitoring
 - **Modern UI/UX:** React-based dashboard with Tailwind CSS styling
 
@@ -72,9 +73,9 @@ This project is an AI-powered, agentic healthcare decision-support system that p
 7. **Drug Interaction Agent** - Provides safety screening for prescribed medications
 8. **Specialist Consultation Agent** - Recommends appropriate specialists
 9. **Quality Assurance Agent** - Reviews all recommendations for consistency and completeness
-10. **Differential Diagnosis Agent** - Generates ranked differential diagnoses
-11. **Predictive Analytics Agent** - Forecasts potential complications
-12. **Clinical Visualization Agent** - Generates visualization data for clinical information
+10. **Differential Diagnosis Agent** - Generates ranked differential diagnoses with enhanced symptom matching
+11. **Predictive Analytics Agent** - Forecasts potential complications with expanded risk factors
+12. **Clinical Visualization Agent** - Generates visualization data for clinical information with improved data accuracy
 13. **Decision Support Agent (Orchestrator)** - Coordinates all agents using LangGraph to compose final recommendations
 
 ## 📁 Project Structure
@@ -367,7 +368,7 @@ The Docker setup maintains full compatibility with the manual setup, so you can 
 
 ### Monitoring Endpoints
 
-- `GET /metrics` - Prometheus metrics endpoint for system monitoring
+- `GET /metrics` - Prometheus metrics endpoint for system monitoring with enhanced latency tracking
 - `GET /` - API root endpoint to check backend status
 
 ### Advanced Agent Endpoints
@@ -480,33 +481,33 @@ Reviews all recommendations for consistency and completeness:
 
 ### Differential Diagnosis Agent
 
-Generates ranked differential diagnoses based on symptoms and vitals:
+Generates ranked differential diagnoses based on symptoms and vitals with enhanced accuracy:
 
-- Database of common medical conditions with symptom profiles
-- Matching algorithm based on symptom overlap
+- Expanded database of common medical conditions with symptom profiles
+- Improved matching algorithm based on symptom overlap and direct symptom consideration
 - Demographic adjustments for age and gender
 - Medical history consideration for risk factors
 - Confidence scoring for each differential
 
 ### Predictive Analytics Agent
 
-Forecasts potential complications based on patient data:
+Forecasts potential complications based on patient data with expanded coverage:
 
-- Complication risk modeling for cardiac, respiratory, infectious, and neurological conditions
-- Risk factor analysis based on medical history
+- Enhanced complication risk modeling for cardiac, respiratory, infectious, neurological, renal, and metabolic conditions
+- Improved risk factor analysis based on medical history and symptoms analysis
 - Vital sign indicator monitoring
 - Prevention strategy recommendations
 - Monitoring protocol suggestions
 
 ### Clinical Visualization Agent
 
-Generates visualization data for clinical information:
+Generates visualization data for clinical information with improved data accuracy:
 
-- Vital signs charts with normal range indicators
-- Risk stratification visualizations
+- Enhanced vital signs charts with normal range indicators and proper data extraction
+- Improved risk stratification visualizations with accurate risk factor representation
 - Treatment timeline representations
 - Symptom distribution charts
-- Patient summary dashboards
+- Patient summary dashboards with comprehensive information
 
 ## 📚 Clinical Knowledge Base
 
@@ -559,11 +560,12 @@ The system integrates with external medical data sources to enhance recommendati
 
 The system exposes Prometheus metrics at `/metrics` endpoint including:
 
-- HTTP request counts and latency
+- HTTP request counts and latency with per-endpoint tracking
 - Active Celery tasks
 - Successful triage completions
 - Average model inference time
 - Database query performance
+- System health indicators
 
 ## 🔧 Development Guidelines
 

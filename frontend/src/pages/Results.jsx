@@ -22,11 +22,15 @@ import {
   FaCalendarAlt,
   FaCapsules,
   FaClipboardCheck,
+  FaBrain,
+  FaChartArea,
 } from "react-icons/fa";
 import { motion } from "framer-motion";
 import { getTaskResult } from "../api";
 import AdvancedAgentResults from "../components/AdvancedAgentResults";
 import ClinicalVisualizations from "../components/ClinicalVisualizations";
+import DifferentialDiagnosis from "../components/DifferentialDiagnosis";
+import PredictiveAnalytics from "../components/PredictiveAnalytics";
 
 const Results = () => {
   const { taskId } = useParams();
@@ -958,6 +962,39 @@ const Results = () => {
           specialistRecommendations={
             finalRecommendation?.specialist_recommendations
           }
+        />
+      </div>
+
+      {/* Differential Diagnosis */}
+      <div className="mb-8">
+        <div className="card-header mb-4">
+          <h2 className="h2 text-neutral-text">Differential Diagnosis</h2>
+          <p className="body-large text-neutral-text-secondary mt-2">
+            AI-powered differential diagnosis with confidence scoring
+          </p>
+        </div>
+        <DifferentialDiagnosis
+          taskId={taskId}
+          patientData={result?.result?.patient_data}
+          symptomsAnalysis={symptomsAnalysis}
+          riskAssessment={riskAssessment}
+        />
+      </div>
+
+      {/* Predictive Analytics */}
+      <div className="mb-8">
+        <div className="card-header mb-4">
+          <h2 className="h2 text-neutral-text">Predictive Analytics</h2>
+          <p className="body-large text-neutral-text-secondary mt-2">
+            Forecasting potential complications and risk stratification
+          </p>
+        </div>
+        <PredictiveAnalytics
+          taskId={taskId}
+          patientData={result?.result?.patient_data}
+          symptomsAnalysis={symptomsAnalysis}
+          riskAssessment={riskAssessment}
+          treatmentRecommendations={finalRecommendation?.treatment_recommendations}
         />
       </div>
 

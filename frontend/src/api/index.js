@@ -88,14 +88,23 @@ export const runQualityAssurance = (requestData) => {
   return apiClient.post('/api/agents/quality', requestData);
 }
 
-export const getDifferentialDiagnosis = (requestData) => {
-  return apiClient.post('/api/agents/differential-diagnosis', requestData);
-}
-
 export const getPredictiveAnalytics = (requestData) => {
   return apiClient.post('/api/agents/predictive-analytics', requestData);
 }
 
 export const getClinicalVisualization = (requestData) => {
-  return apiClient.post('/api/agents/clinical-visualization', requestData);
+  console.log('Sending clinical visualization request:', requestData);
+  return apiClient.post('/api/agents/clinical-visualization', requestData)
+    .then(response => {
+      console.log('Received clinical visualization response:', response.data);
+      return response;
+    })
+    .catch(error => {
+      console.error('Error in clinical visualization request:', error);
+      throw error;
+    });
+}
+
+export const getDifferentialDiagnosis = (requestData) => {
+  return apiClient.post('/api/agents/differential-diagnosis', requestData);
 }
