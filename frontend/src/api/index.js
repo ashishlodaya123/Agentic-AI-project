@@ -31,7 +31,7 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
-    console.error('API Response Error:', error.response?.status, error.response?.data);
+    console.error('API Response Error:', error.response?.status, error.response?.data, error.config?.url);
     return Promise.reject(error);
   }
 );
@@ -54,7 +54,13 @@ export const getTaskResult = (taskId) => {
 
 export const getMetrics = () => {
   // Use the direct /metrics endpoint instead of /api/metrics
-  return axios.get(`${baseURL}/metrics`);
+  console.log('Fetching metrics from:', `${baseURL}/metrics`);
+  return apiClient.get('/metrics')
+    .catch(error => {
+      console.error('Error fetching metrics:', error);
+      // If the apiClient fails, try a direct axios call as fallback
+      return axios.get(`${baseURL}/metrics`);
+    });
 };
 
 export const checkBackendStatus = () => {

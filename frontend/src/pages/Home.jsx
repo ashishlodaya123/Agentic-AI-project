@@ -1,40 +1,65 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FaCheckCircle, FaExclamationTriangle, FaSkull, FaShieldAlt, FaCogs, FaChartBar, FaUserMd } from 'react-icons/fa';
-import { GiMedicalPack } from 'react-icons/gi';
-import { checkBackendStatus } from '../api';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  FaCheckCircle,
+  FaExclamationTriangle,
+  FaSkull,
+  FaShieldAlt,
+  FaCogs,
+  FaChartBar,
+  FaUserMd,
+} from "react-icons/fa";
+import { GiMedicalPack } from "react-icons/gi";
+import { checkBackendStatus } from "../api";
 
 const Home = () => {
-  const [backendStatus, setBackendStatus] = useState('Checking...');
+  const [backendStatus, setBackendStatus] = useState("Checking...");
   const navigate = useNavigate();
 
   useEffect(() => {
     checkBackendStatus()
-      .then(response => {
+      .then((response) => {
         if (response && response.status === 200) {
-          setBackendStatus('Connected');
+          setBackendStatus("Connected");
         } else {
-          setBackendStatus('Disconnected');
+          setBackendStatus("Disconnected");
         }
       })
       .catch(() => {
-        setBackendStatus('Disconnected');
+        setBackendStatus("Disconnected");
       });
   }, []);
 
   // Status badge component
   const StatusBadge = ({ status }) => {
     const statusConfig = {
-      'Connected': { bg: 'bg-green-100', text: 'text-green-800', label: 'Connected', icon: FaCheckCircle },
-      'Disconnected': { bg: 'bg-red-100', text: 'text-red-800', label: 'Disconnected', icon: FaSkull },
-      'Checking...': { bg: 'bg-amber-100', text: 'text-amber-800', label: 'Checking...', icon: FaExclamationTriangle }
+      Connected: {
+        bg: "bg-green-100",
+        text: "text-green-800",
+        label: "Connected",
+        icon: FaCheckCircle,
+      },
+      Disconnected: {
+        bg: "bg-red-100",
+        text: "text-red-800",
+        label: "Disconnected",
+        icon: FaSkull,
+      },
+      "Checking...": {
+        bg: "bg-amber-100",
+        text: "text-amber-800",
+        label: "Checking...",
+        icon: FaExclamationTriangle,
+      },
     };
-    
-    const config = statusConfig[status] || statusConfig['Disconnected'];
+
+    const config = statusConfig[status] || statusConfig["Disconnected"];
     const Icon = config.icon;
-    
+
     return (
-      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${config.bg} ${config.text}`}>
+      <span
+        className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${config.bg} ${config.text}`}
+      >
         <Icon className={`w-4 h-4 mr-2`} />
         {config.label}
       </span>
@@ -42,7 +67,7 @@ const Home = () => {
   };
 
   const handleStartTriage = () => {
-    navigate('/triage');
+    navigate("/triage");
   };
 
   return (
@@ -51,12 +76,17 @@ const Home = () => {
       <div className="bg-gradient-to-r from-primary to-secondary rounded-2xl shadow-lg p-8 mb-8">
         <div className="flex flex-col lg:flex-row items-center">
           <div className="lg:w-2/3 mb-8 lg:mb-0 lg:pr-8">
-            <h1 className="display text-white mb-4">Agentic Clinical Decision Assistant</h1>
+            <h1 className="display text-white mb-4">
+              Agentic Clinical Decision Assistant
+            </h1>
             <p className="text-xl text-blue-100 mb-6">
-              AI-powered real-time emergency triage system for healthcare professionals
+              AI-powered real-time emergency triage system for healthcare
+              professionals
             </p>
             <div className="flex flex-col sm:flex-row sm:items-center">
-              <span className="text-blue-100 font-medium mr-3 mb-2 sm:mb-0">Backend Status:</span>
+              <span className="text-blue-100 font-medium mr-3 mb-2 sm:mb-0">
+                Backend Status:
+              </span>
               <StatusBadge status={backendStatus} />
             </div>
           </div>
@@ -93,7 +123,8 @@ const Home = () => {
               <h3 className="h3 text-neutral-text">Multi-Agent System</h3>
             </div>
             <p className="body-large text-neutral-text-secondary">
-              Specialized AI agents for risk stratification, medical imaging, and knowledge retrieval
+              Specialized AI agents for risk stratification, medical imaging,
+              and knowledge retrieval
             </p>
           </div>
         </div>
@@ -162,7 +193,7 @@ const Home = () => {
 
       {/* Quick Actions */}
       <div className="mt-8 text-center">
-        <button 
+        <button
           onClick={handleStartTriage}
           className="btn btn-primary inline-flex items-center"
         >

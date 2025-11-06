@@ -1,10 +1,32 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { FaExclamationTriangle, FaExclamationCircle, FaInfoCircle, FaHeartbeat, FaFileMedical, FaBookMedical, FaPrint, FaUserMd, FaTemperatureHigh, FaTint, FaWeight, FaCheck, FaTimes, FaAmbulance, FaStethoscope, FaHospital, FaClock, FaPrescription, FaCalendarAlt, FaCapsules, FaClipboardCheck } from 'react-icons/fa';
-import { motion } from 'framer-motion';
-import { getTaskResult } from '../api';
-import AdvancedAgentResults from '../components/AdvancedAgentResults';
-import ClinicalVisualizations from '../components/ClinicalVisualizations';
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  FaExclamationTriangle,
+  FaExclamationCircle,
+  FaInfoCircle,
+  FaHeartbeat,
+  FaFileMedical,
+  FaBookMedical,
+  FaPrint,
+  FaUserMd,
+  FaTemperatureHigh,
+  FaTint,
+  FaWeight,
+  FaCheck,
+  FaTimes,
+  FaAmbulance,
+  FaStethoscope,
+  FaHospital,
+  FaClock,
+  FaPrescription,
+  FaCalendarAlt,
+  FaCapsules,
+  FaClipboardCheck,
+} from "react-icons/fa";
+import { motion } from "framer-motion";
+import { getTaskResult } from "../api";
+import AdvancedAgentResults from "../components/AdvancedAgentResults";
+import ClinicalVisualizations from "../components/ClinicalVisualizations";
 
 const Results = () => {
   const { taskId } = useParams();
@@ -17,40 +39,43 @@ const Results = () => {
     // Try to load cached result first
     const cachedResult = localStorage.getItem(`triage_result_${taskId}`);
     let initialResult = null;
-    
+
     if (cachedResult) {
       try {
         initialResult = JSON.parse(cachedResult);
         setResult(initialResult);
         setLoading(false);
       } catch (e) {
-        console.error('Error parsing cached result:', e);
+        console.error("Error parsing cached result:", e);
       }
     }
 
     const pollResult = setInterval(() => {
       getTaskResult(taskId)
-        .then(response => {
-          if (response.data.status === 'Success') {
+        .then((response) => {
+          if (response.data.status === "Success") {
             // Cache the result with timestamp
             const resultToCache = {
               ...response.data.result,
-              cachedAt: new Date().toISOString()
+              cachedAt: new Date().toISOString(),
             };
-            localStorage.setItem(`triage_result_${taskId}`, JSON.stringify(resultToCache));
+            localStorage.setItem(
+              `triage_result_${taskId}`,
+              JSON.stringify(resultToCache)
+            );
             setResult(response.data.result);
             setLoading(false);
             clearInterval(pollResult);
-          } else if (response.data.status === 'Failed') {
-            setError('Triage process failed.');
+          } else if (response.data.status === "Failed") {
+            setError("Triage process failed.");
             setLoading(false);
             clearInterval(pollResult);
           }
         })
-        .catch(err => {
+        .catch((err) => {
           // If we have cached data, use it even if API fails
           if (!initialResult) {
-            setError('Error fetching results.');
+            setError("Error fetching results.");
             setLoading(false);
           }
           clearInterval(pollResult);
@@ -61,7 +86,7 @@ const Results = () => {
   }, [taskId]);
 
   const handleStartNewTriage = () => {
-    navigate('/triage');
+    navigate("/triage");
   };
 
   const handlePrintReport = () => {
@@ -78,13 +103,15 @@ const Results = () => {
               transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
               className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full mx-auto mb-6"
             />
-            <h2 className="h2 text-neutral-text mb-2">Analyzing Patient Data</h2>
+            <h2 className="h2 text-neutral-text mb-2">
+              Analyzing Patient Data
+            </h2>
             <p className="body-large text-neutral-text-secondary">
               Our AI system is processing the patient information...
             </p>
             <div className="mt-6 w-full bg-neutral-border rounded-full h-2.5">
-              <motion.div 
-                className="bg-primary h-2.5 rounded-full" 
+              <motion.div
+                className="bg-primary h-2.5 rounded-full"
                 initial={{ width: "0%" }}
                 animate={{ width: "100%" }}
                 transition={{ duration: 2, repeat: Infinity }}
@@ -109,7 +136,7 @@ const Results = () => {
               <p className="body-large text-neutral-text-secondary">{error}</p>
             </div>
             <div className="mt-6">
-              <button 
+              <button
                 onClick={handleStartNewTriage}
                 className="btn btn-primary"
               >
@@ -138,7 +165,7 @@ const Results = () => {
               </p>
             </div>
             <div className="mt-6">
-              <button 
+              <button
                 onClick={handleStartNewTriage}
                 className="btn btn-primary"
               >
@@ -166,7 +193,7 @@ const Results = () => {
           bg: "bg-red-100",
           badge: "badge-error",
           border: "border-red-500",
-          icon: FaAmbulance
+          icon: FaAmbulance,
         };
       case "orange":
       case "high":
@@ -175,7 +202,7 @@ const Results = () => {
           bg: "bg-orange-100",
           badge: "badge-warning",
           border: "border-orange-500",
-          icon: FaExclamationTriangle
+          icon: FaExclamationTriangle,
         };
       case "yellow":
       case "moderate":
@@ -184,7 +211,7 @@ const Results = () => {
           bg: "bg-amber-100",
           badge: "badge-warning",
           border: "border-amber-500",
-          icon: FaInfoCircle
+          icon: FaInfoCircle,
         };
       case "green":
       case "low":
@@ -193,7 +220,7 @@ const Results = () => {
           bg: "bg-green-100",
           badge: "badge-success",
           border: "border-green-500",
-          icon: FaInfoCircle
+          icon: FaInfoCircle,
         };
       case "blue":
       case "minimal":
@@ -202,7 +229,7 @@ const Results = () => {
           bg: "bg-blue-100",
           badge: "badge-info",
           border: "border-blue-500",
-          icon: FaInfoCircle
+          icon: FaInfoCircle,
         };
       default:
         return {
@@ -210,7 +237,7 @@ const Results = () => {
           bg: "bg-blue-100",
           badge: "badge-info",
           border: "border-blue-500",
-          icon: FaInfoCircle
+          icon: FaInfoCircle,
         };
     }
   };
@@ -220,23 +247,34 @@ const Results = () => {
 
   const formatVitalSign = (name, vital) => {
     if (!vital) return null;
-    
-    const statusClass = vital.status === "normal" ? "text-green-600" : 
-                       vital.status === "abnormal" ? "text-red-600" : 
-                       "text-gray-500";
-    
-    const statusText = vital.status === "normal" ? "Normal" : 
-                      vital.status === "abnormal" ? "Abnormal" : 
-                      "Invalid";
-    
+
+    const statusClass =
+      vital.status === "normal"
+        ? "text-green-600"
+        : vital.status === "abnormal"
+        ? "text-red-600"
+        : "text-gray-500";
+
+    const statusText =
+      vital.status === "normal"
+        ? "Normal"
+        : vital.status === "abnormal"
+        ? "Abnormal"
+        : "Invalid";
+
     return (
-      <div key={name} className="flex items-center justify-between py-2 border-b border-neutral-border">
-        <span className="body-large text-neutral-text capitalize">{name.replace('_', ' ')}</span>
+      <div
+        key={name}
+        className="flex items-center justify-between py-2 border-b border-neutral-border"
+      >
+        <span className="body-large text-neutral-text capitalize">
+          {name.replace("_", " ")}
+        </span>
         <div className="flex items-center">
-          <span className="font-medium mr-2">{vital.value} {vital.unit}</span>
-          <span className={`text-sm ${statusClass}`}>
-            {statusText}
+          <span className="font-medium mr-2">
+            {vital.value} {vital.unit}
           </span>
+          <span className={`text-sm ${statusClass}`}>{statusText}</span>
         </div>
       </div>
     );
@@ -244,14 +282,14 @@ const Results = () => {
 
   const renderRiskFactors = (riskFactors) => {
     // Handle case where riskFactors might be undefined or null
-    if (!riskFactors || typeof riskFactors !== 'object') return null;
-    
+    if (!riskFactors || typeof riskFactors !== "object") return null;
+
     // Get all keys that have actual values
-    const validKeys = Object.keys(riskFactors).filter(key => {
+    const validKeys = Object.keys(riskFactors).filter((key) => {
       const value = riskFactors[key];
-      return value !== undefined && value !== null && value !== '';
+      return value !== undefined && value !== null && value !== "";
     });
-    
+
     if (validKeys.length === 0) {
       return (
         <div className="text-neutral-text-secondary italic">
@@ -259,13 +297,15 @@ const Results = () => {
         </div>
       );
     }
-    
+
     return (
       <div className="space-y-3">
         {validKeys.map((key) => {
           const value = riskFactors[key];
-          const displayName = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-          
+          const displayName = key
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (l) => l.toUpperCase());
+
           // Handle different value types
           if (Array.isArray(value)) {
             if (value.length === 0) return null;
@@ -274,35 +314,49 @@ const Results = () => {
                 <h5 className="font-medium text-neutral-text">{displayName}</h5>
                 <ul className="list-disc pl-5 mt-1 space-y-1">
                   {value.map((item, idx) => (
-                    <li key={idx} className="body-small text-neutral-text-secondary">
-                      {typeof item === 'string' ? item : 
-                       typeof item === 'object' ? (item.symptom || item.name || JSON.stringify(item)) : 
-                       String(item)}
+                    <li
+                      key={idx}
+                      className="body-small text-neutral-text-secondary"
+                    >
+                      {typeof item === "string"
+                        ? item
+                        : typeof item === "object"
+                        ? item.symptom || item.name || JSON.stringify(item)
+                        : String(item)}
                     </li>
                   ))}
                 </ul>
               </div>
             );
-          } else if (typeof value === 'object' && value !== null) {
+          } else if (typeof value === "object" && value !== null) {
             // Handle nested objects
-            const nestedKeys = Object.keys(value).filter(nestedKey => 
-              value[nestedKey] !== undefined && value[nestedKey] !== null && value[nestedKey] !== ''
+            const nestedKeys = Object.keys(value).filter(
+              (nestedKey) =>
+                value[nestedKey] !== undefined &&
+                value[nestedKey] !== null &&
+                value[nestedKey] !== ""
             );
-            
+
             if (nestedKeys.length === 0) return null;
-            
+
             return (
               <div key={key} className="mb-2">
                 <h5 className="font-medium text-neutral-text">{displayName}</h5>
                 <div className="grid grid-cols-2 gap-2 mt-1">
                   {nestedKeys.map((nestedKey) => {
                     const nestedValue = value[nestedKey];
-                    const nestedDisplayName = nestedKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    const nestedDisplayName = nestedKey
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (l) => l.toUpperCase());
                     return (
                       <div key={nestedKey} className="flex justify-between">
-                        <span className="body-small text-neutral-text-secondary">{nestedDisplayName}</span>
+                        <span className="body-small text-neutral-text-secondary">
+                          {nestedDisplayName}
+                        </span>
                         <span className="body-small text-neutral-text font-medium">
-                          {typeof nestedValue === 'number' ? nestedValue.toFixed(2) : String(nestedValue)}
+                          {typeof nestedValue === "number"
+                            ? nestedValue.toFixed(2)
+                            : String(nestedValue)}
                         </span>
                       </div>
                     );
@@ -312,12 +366,14 @@ const Results = () => {
             );
           } else {
             // Handle primitive values
-            if (value === 0 || value === '') return null;
+            if (value === 0 || value === "") return null;
             return (
               <div key={key} className="flex justify-between">
-                <span className="body-small text-neutral-text-secondary">{displayName}</span>
+                <span className="body-small text-neutral-text-secondary">
+                  {displayName}
+                </span>
                 <span className="body-small text-neutral-text font-medium">
-                  {typeof value === 'number' ? value.toFixed(2) : String(value)}
+                  {typeof value === "number" ? value.toFixed(2) : String(value)}
                 </span>
               </div>
             );
@@ -330,9 +386,12 @@ const Results = () => {
   return (
     <div className="max-w-6xl mx-auto print:max-w-full">
       <div className="mb-6">
-        <h1 className="h1 text-neutral-text">Comprehensive Clinical Triage Report</h1>
+        <h1 className="h1 text-neutral-text">
+          Comprehensive Clinical Triage Report
+        </h1>
         <p className="body-large text-neutral-text-secondary mt-2">
-          AI-powered clinical decision support with integrated medical literature and guidelines
+          AI-powered clinical decision support with integrated medical
+          literature and guidelines
         </p>
       </div>
 
@@ -341,65 +400,105 @@ const Results = () => {
         <div className="card-header">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <h2 className="h2 text-neutral-text">Clinical Decision Summary</h2>
-            <span className={`badge ${urgencyConfig.badge} mt-2 md:mt-0 flex items-center text-lg py-2 px-4`}>
+            <span
+              className={`badge ${urgencyConfig.badge} mt-2 md:mt-0 flex items-center text-lg py-2 px-4`}
+            >
               <UrgencyIcon className="mr-2" />
-              {finalRecommendation.urgency_level} Priority - {finalRecommendation.priority} Care
+              {finalRecommendation.urgency_level} Priority -{" "}
+              {finalRecommendation.priority} Care
             </span>
           </div>
         </div>
         <div className="card-body">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
-              <h3 className="h3 text-neutral-text mb-4">Triage Recommendation</h3>
+              <h3 className="h3 text-neutral-text mb-4">
+                Triage Recommendation
+              </h3>
               <p className="body-large text-neutral-text mb-6">
                 {finalRecommendation.recommended_action}
               </p>
-              
+
               <div className="space-y-4">
                 <div>
-                  <h4 className="font-medium text-neutral-text mb-2">Next Steps</h4>
+                  <h4 className="font-medium text-neutral-text mb-2">
+                    Next Steps
+                  </h4>
                   <ul className="list-disc pl-5 space-y-2">
                     {finalRecommendation.next_steps?.map((step, index) => (
-                      <li key={index} className="body-large text-neutral-text-secondary">{step}</li>
+                      <li
+                        key={index}
+                        className="body-large text-neutral-text-secondary"
+                      >
+                        {step}
+                      </li>
                     ))}
                   </ul>
                 </div>
               </div>
             </div>
-            
+
             <div>
               <h3 className="h3 text-neutral-text mb-4">Risk Assessment</h3>
               <div className="space-y-4">
                 <div>
                   <div className="flex justify-between mb-1">
-                    <span className="body-small text-neutral-text-secondary">Risk Score</span>
-                    <span className="font-medium text-neutral-text">{(riskAssessment.risk_score || finalRecommendation.risk_score || 0).toFixed(3)}</span>
+                    <span className="body-small text-neutral-text-secondary">
+                      Risk Score
+                    </span>
+                    <span className="font-medium text-neutral-text">
+                      {(
+                        riskAssessment.risk_score ||
+                        finalRecommendation.risk_score ||
+                        0
+                      ).toFixed(3)}
+                    </span>
                   </div>
                   <div className="w-full bg-neutral-border rounded-full h-2.5">
-                    <div 
-                      className="bg-primary h-2.5 rounded-full" 
-                      style={{ width: `${(riskAssessment.risk_score || finalRecommendation.risk_score) * 100}%` }}
+                    <div
+                      className="bg-primary h-2.5 rounded-full"
+                      style={{
+                        width: `${
+                          (riskAssessment.risk_score ||
+                            finalRecommendation.risk_score) * 100
+                        }%`,
+                      }}
                     ></div>
                   </div>
                   <div className="flex justify-between mt-1">
-                    <span className="text-xs text-neutral-text-secondary">0.0</span>
-                    <span className="text-xs text-neutral-text-secondary">1.0</span>
+                    <span className="text-xs text-neutral-text-secondary">
+                      0.0
+                    </span>
+                    <span className="text-xs text-neutral-text-secondary">
+                      1.0
+                    </span>
                   </div>
                 </div>
-                
+
                 <div className="pt-4 border-t border-neutral-border">
                   <div className="flex justify-between">
-                    <span className="body-small text-neutral-text-secondary">Risk Category</span>
-                    <span className="font-medium text-neutral-text">{riskAssessment.risk_category || 'Not assessed'}</span>
-                  </div>
-                  <div className="flex justify-between mt-2">
-                    <span className="body-small text-neutral-text-secondary">Action Required</span>
-                    <span className="font-medium text-neutral-text">{finalRecommendation.recommended_action}</span>
-                  </div>
-                  <div className="flex justify-between mt-2">
-                    <span className="body-small text-neutral-text-secondary">Timeframe</span>
+                    <span className="body-small text-neutral-text-secondary">
+                      Risk Category
+                    </span>
                     <span className="font-medium text-neutral-text">
-                      {riskAssessment.triage_recommendation?.timeframe || 'As clinically indicated'}
+                      {riskAssessment.risk_category || "Not assessed"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between mt-2">
+                    <span className="body-small text-neutral-text-secondary">
+                      Action Required
+                    </span>
+                    <span className="font-medium text-neutral-text">
+                      {finalRecommendation.recommended_action}
+                    </span>
+                  </div>
+                  <div className="flex justify-between mt-2">
+                    <span className="body-small text-neutral-text-secondary">
+                      Timeframe
+                    </span>
+                    <span className="font-medium text-neutral-text">
+                      {riskAssessment.triage_recommendation?.timeframe ||
+                        "As clinically indicated"}
                     </span>
                   </div>
                 </div>
@@ -418,98 +517,149 @@ const Results = () => {
               <div className="bg-blue-100 p-2 rounded-lg mr-3">
                 <FaHeartbeat className="h-5 w-5 text-primary" />
               </div>
-              <h3 className="h3 text-neutral-text">Comprehensive Clinical Assessment</h3>
+              <h3 className="h3 text-neutral-text">
+                Comprehensive Clinical Assessment
+              </h3>
             </div>
           </div>
           <div className="card-body">
-            {symptomsAnalysis.vital_signs && Object.keys(symptomsAnalysis.vital_signs).length > 0 && (
-              <div className="mb-6">
-                <h4 className="h4 text-neutral-text mb-3 flex items-center">
-                  <FaHeartbeat className="mr-2" />
-                  Vital Signs Analysis
-                </h4>
-                <div className="space-y-3">
-                  {Object.entries(symptomsAnalysis.vital_signs).map(([name, vital]) => (
-                    <div key={name} className="border border-neutral-border rounded-lg p-3">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium text-neutral-text capitalize">{name.replace('_', ' ')}</span>
-                        <span className={`badge ${vital.status === 'normal' ? 'badge-success' : 'badge-error'}`}>
-                          {vital.status}
-                        </span>
-                      </div>
-                      <div className="mt-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-neutral-text-secondary">Value</span>
-                          <span className="font-medium">{vital.value} {vital.unit}</span>
-                        </div>
-                        <div className="flex justify-between text-sm mt-1">
-                          <span className="text-neutral-text-secondary">Normal Range</span>
-                          <span className="font-medium">{vital.normal_range}</span>
-                        </div>
-                        <div className="mt-2 text-sm">
-                          <span className="text-neutral-text-secondary">Interpretation: </span>
-                          <span className="font-medium">{vital.interpretation}</span>
-                        </div>
-                        <div className="mt-1 text-sm">
-                          <span className="text-neutral-text-secondary">Clinical Significance: </span>
-                          <span className="font-medium">{vital.clinical_significance}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {symptomsAnalysis.symptom_categories && Object.keys(symptomsAnalysis.symptom_categories).length > 0 && (
-              <div className="mb-6">
-                <h4 className="h4 text-neutral-text mb-3 flex items-center">
-                  <FaUserMd className="mr-2" />
-                  Symptom Analysis by System
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {Object.entries(symptomsAnalysis.symptom_categories).map(([category, symptoms]) => {
-                    if (symptoms && symptoms.length > 0) {
-                      return (
-                        <div key={category} className="border border-neutral-border rounded-lg p-3">
-                          <h5 className="font-medium text-neutral-text capitalize mb-2">{category}</h5>
-                          <div className="flex flex-wrap gap-1">
-                            {symptoms.map((symptom, index) => (
-                              <span key={index} className="badge badge-info text-xs">
-                                {symptom}
+            {symptomsAnalysis.vital_signs &&
+              Object.keys(symptomsAnalysis.vital_signs).length > 0 && (
+                <div className="mb-6">
+                  <h4 className="h4 text-neutral-text mb-3 flex items-center">
+                    <FaHeartbeat className="mr-2" />
+                    Vital Signs Analysis
+                  </h4>
+                  <div className="space-y-3">
+                    {Object.entries(symptomsAnalysis.vital_signs).map(
+                      ([name, vital]) => (
+                        <div
+                          key={name}
+                          className="border border-neutral-border rounded-lg p-3"
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium text-neutral-text capitalize">
+                              {name.replace("_", " ")}
+                            </span>
+                            <span
+                              className={`badge ${
+                                vital.status === "normal"
+                                  ? "badge-success"
+                                  : "badge-error"
+                              }`}
+                            >
+                              {vital.status}
+                            </span>
+                          </div>
+                          <div className="mt-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-neutral-text-secondary">
+                                Value
                               </span>
-                            ))}
+                              <span className="font-medium">
+                                {vital.value} {vital.unit}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-sm mt-1">
+                              <span className="text-neutral-text-secondary">
+                                Normal Range
+                              </span>
+                              <span className="font-medium">
+                                {vital.normal_range}
+                              </span>
+                            </div>
+                            <div className="mt-2 text-sm">
+                              <span className="text-neutral-text-secondary">
+                                Interpretation:{" "}
+                              </span>
+                              <span className="font-medium">
+                                {vital.interpretation}
+                              </span>
+                            </div>
+                            <div className="mt-1 text-sm">
+                              <span className="text-neutral-text-secondary">
+                                Clinical Significance:{" "}
+                              </span>
+                              <span className="font-medium">
+                                {vital.clinical_significance}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      );
-                    }
-                    return null;
-                  })}
+                      )
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-            
-            {symptomsAnalysis.primary_concerns && symptomsAnalysis.primary_concerns.length > 0 && (
-              <div className="mb-6">
-                <h4 className="h4 text-neutral-text mb-3 flex items-center">
-                  <FaExclamationTriangle className="mr-2 text-amber-500" />
-                  Primary Clinical Concerns
-                </h4>
-                <div className="space-y-2">
-                  {symptomsAnalysis.primary_concerns.map((concern, index) => (
-                    <div key={index} className="border border-amber-200 bg-amber-50 rounded-lg p-3">
-                      <div className="flex justify-between">
-                        <span className="font-medium text-amber-800">{concern.name || concern.type}</span>
-                        <span className="badge badge-warning">{concern.severity || concern.type}</span>
-                      </div>
-                      <div className="mt-1 text-sm text-amber-700">
-                        {concern.interpretation || concern.significance}
-                      </div>
-                    </div>
-                  ))}
+              )}
+
+            {symptomsAnalysis.symptom_categories &&
+              Object.keys(symptomsAnalysis.symptom_categories).length > 0 && (
+                <div className="mb-6">
+                  <h4 className="h4 text-neutral-text mb-3 flex items-center">
+                    <FaUserMd className="mr-2" />
+                    Symptom Analysis by System
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {Object.entries(symptomsAnalysis.symptom_categories).map(
+                      ([category, symptoms]) => {
+                        if (symptoms && symptoms.length > 0) {
+                          return (
+                            <div
+                              key={category}
+                              className="border border-neutral-border rounded-lg p-3"
+                            >
+                              <h5 className="font-medium text-neutral-text capitalize mb-2">
+                                {category}
+                              </h5>
+                              <div className="flex flex-wrap gap-1">
+                                {symptoms.map((symptom, index) => (
+                                  <span
+                                    key={index}
+                                    className="badge badge-info text-xs"
+                                  >
+                                    {symptom}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+
+            {symptomsAnalysis.primary_concerns &&
+              symptomsAnalysis.primary_concerns.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="h4 text-neutral-text mb-3 flex items-center">
+                    <FaExclamationTriangle className="mr-2 text-amber-500" />
+                    Primary Clinical Concerns
+                  </h4>
+                  <div className="space-y-2">
+                    {symptomsAnalysis.primary_concerns.map((concern, index) => (
+                      <div
+                        key={index}
+                        className="border border-amber-200 bg-amber-50 rounded-lg p-3"
+                      >
+                        <div className="flex justify-between">
+                          <span className="font-medium text-amber-800">
+                            {concern.name || concern.type}
+                          </span>
+                          <span className="badge badge-warning">
+                            {concern.severity || concern.type}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-sm text-amber-700">
+                          {concern.interpretation || concern.significance}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
           </div>
         </div>
 
@@ -520,22 +670,36 @@ const Results = () => {
               <div className="bg-purple-100 p-2 rounded-lg mr-3">
                 <FaBookMedical className="h-5 w-5 text-purple-600" />
               </div>
-              <h3 className="h3 text-neutral-text">Evidence-Based Clinical Guidance</h3>
+              <h3 className="h3 text-neutral-text">
+                Evidence-Based Clinical Guidance
+              </h3>
             </div>
           </div>
           <div className="card-body">
             {ragResults && ragResults.length > 0 ? (
               <div className="space-y-4">
                 {ragResults.map((guideline, index) => (
-                  <div key={index} className="border border-neutral-border rounded-lg p-4">
+                  <div
+                    key={index}
+                    className="border border-neutral-border rounded-lg p-4"
+                  >
                     <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-medium text-neutral-text">{guideline.title}</h4>
+                      <h4 className="font-medium text-neutral-text">
+                        {guideline.title}
+                      </h4>
                       <div className="flex flex-col items-end">
-                        <span className={`badge ${guideline.external ? 'badge-success' : 'badge-info'} mb-1`}>
-                          {guideline.external ? 'External Source' : 'Local Guidelines'}
+                        <span
+                          className={`badge ${
+                            guideline.external ? "badge-success" : "badge-info"
+                          } mb-1`}
+                        >
+                          {guideline.external
+                            ? "External Source"
+                            : "Local Guidelines"}
                         </span>
                         <span className="badge badge-secondary text-xs">
-                          Relevance: {Math.round(guideline.relevance_score * 100)}%
+                          Relevance:{" "}
+                          {Math.round(guideline.relevance_score * 100)}%
                         </span>
                       </div>
                     </div>
@@ -544,14 +708,22 @@ const Results = () => {
                     </p>
                     {guideline.source && (
                       <div className="mt-2 flex items-center">
-                        <span className="body-small text-neutral-text-secondary">Source: </span>
-                        <span className="body-small font-medium text-neutral-text ml-1">{guideline.source}</span>
+                        <span className="body-small text-neutral-text-secondary">
+                          Source:{" "}
+                        </span>
+                        <span className="body-small font-medium text-neutral-text ml-1">
+                          {guideline.source}
+                        </span>
                       </div>
                     )}
                     {guideline.evidence_level && (
                       <div className="mt-1">
-                        <span className="body-small text-neutral-text-secondary">Evidence Level: </span>
-                        <span className="body-small font-medium text-neutral-text">{guideline.evidence_level}</span>
+                        <span className="body-small text-neutral-text-secondary">
+                          Evidence Level:{" "}
+                        </span>
+                        <span className="body-small font-medium text-neutral-text">
+                          {guideline.evidence_level}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -560,7 +732,9 @@ const Results = () => {
             ) : (
               <div className="text-center py-8">
                 <FaBookMedical className="h-12 w-12 text-neutral-text-secondary mx-auto mb-3" />
-                <p className="body-large text-neutral-text-secondary">No relevant clinical guidelines found for this case.</p>
+                <p className="body-large text-neutral-text-secondary">
+                  No relevant clinical guidelines found for this case.
+                </p>
               </div>
             )}
           </div>
@@ -574,7 +748,9 @@ const Results = () => {
             <div className="bg-red-100 p-2 rounded-lg mr-3">
               <FaExclamationTriangle className="h-5 w-5 text-red-600" />
             </div>
-            <h3 className="h3 text-neutral-text">Detailed Risk Stratification Analysis</h3>
+            <h3 className="h3 text-neutral-text">
+              Detailed Risk Stratification Analysis
+            </h3>
           </div>
         </div>
         <div className="card-body">
@@ -586,7 +762,7 @@ const Results = () => {
               </h4>
               {renderRiskFactors(riskAssessment.vital_risks)}
             </div>
-            
+
             <div className="border border-neutral-border rounded-lg p-4">
               <h4 className="font-medium text-neutral-text mb-3 flex items-center">
                 <FaUserMd className="mr-2" />
@@ -594,7 +770,7 @@ const Results = () => {
               </h4>
               {renderRiskFactors(riskAssessment.symptom_risks)}
             </div>
-            
+
             <div className="border border-neutral-border rounded-lg p-4">
               <h4 className="font-medium text-neutral-text mb-3 flex items-center">
                 <FaClock className="mr-2" />
@@ -603,11 +779,15 @@ const Results = () => {
               {renderRiskFactors(riskAssessment.demographic_risks)}
             </div>
           </div>
-          
+
           {riskAssessment.risk_explanation && (
             <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-medium text-neutral-text mb-2">Risk Assessment Summary</h4>
-              <p className="body-large text-neutral-text-secondary">{riskAssessment.risk_explanation}</p>
+              <h4 className="font-medium text-neutral-text mb-2">
+                Risk Assessment Summary
+              </h4>
+              <p className="body-large text-neutral-text-secondary">
+                {riskAssessment.risk_explanation}
+              </p>
             </div>
           )}
         </div>
@@ -628,49 +808,91 @@ const Results = () => {
             <div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <h4 className="h4 text-neutral-text mb-3">Image Characteristics</h4>
+                  <h4 className="h4 text-neutral-text mb-3">
+                    Image Characteristics
+                  </h4>
                   <div className="space-y-2">
                     <div className="flex justify-between py-2 border-b border-neutral-border">
-                      <span className="body-large text-neutral-text-secondary">Type</span>
-                      <span className="font-medium text-neutral-text">{imagingAnalysis.analysis?.imaging_type}</span>
+                      <span className="body-large text-neutral-text-secondary">
+                        Type
+                      </span>
+                      <span className="font-medium text-neutral-text">
+                        {imagingAnalysis.analysis?.imaging_type}
+                      </span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-neutral-border">
-                      <span className="body-large text-neutral-text-secondary">Dimensions</span>
-                      <span className="font-medium text-neutral-text">{imagingAnalysis.analysis?.dimensions}</span>
+                      <span className="body-large text-neutral-text-secondary">
+                        Dimensions
+                      </span>
+                      <span className="font-medium text-neutral-text">
+                        {imagingAnalysis.analysis?.dimensions}
+                      </span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-neutral-border">
-                      <span className="body-large text-neutral-text-secondary">Format</span>
-                      <span className="font-medium text-neutral-text">{imagingAnalysis.analysis?.color_format}</span>
+                      <span className="body-large text-neutral-text-secondary">
+                        Format
+                      </span>
+                      <span className="font-medium text-neutral-text">
+                        {imagingAnalysis.analysis?.color_format}
+                      </span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-neutral-border">
-                      <span className="body-large text-neutral-text-secondary">File Size</span>
-                      <span className="font-medium text-neutral-text">{imagingAnalysis.analysis?.file_size}</span>
+                      <span className="body-large text-neutral-text-secondary">
+                        File Size
+                      </span>
+                      <span className="font-medium text-neutral-text">
+                        {imagingAnalysis.analysis?.file_size}
+                      </span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-neutral-border">
-                      <span className="body-large text-neutral-text-secondary">Quality</span>
-                      <span className="font-medium text-neutral-text">{imagingAnalysis.analysis?.technical_quality}</span>
+                      <span className="body-large text-neutral-text-secondary">
+                        Quality
+                      </span>
+                      <span className="font-medium text-neutral-text">
+                        {imagingAnalysis.analysis?.technical_quality}
+                      </span>
                     </div>
                   </div>
                 </div>
-                
+
                 <div>
-                  <h4 className="h4 text-neutral-text mb-3">Clinical Analysis</h4>
+                  <h4 className="h4 text-neutral-text mb-3">
+                    Clinical Analysis
+                  </h4>
                   <div className="space-y-3">
                     <div>
-                      <h5 className="font-medium text-neutral-text mb-2">Key Observations</h5>
+                      <h5 className="font-medium text-neutral-text mb-2">
+                        Key Observations
+                      </h5>
                       <ul className="list-disc pl-5 space-y-1">
-                        {imagingAnalysis.analysis?.observations?.map((observation, index) => (
-                          <li key={index} className="body-small text-neutral-text-secondary">{observation}</li>
-                        ))}
+                        {imagingAnalysis.analysis?.observations?.map(
+                          (observation, index) => (
+                            <li
+                              key={index}
+                              className="body-small text-neutral-text-secondary"
+                            >
+                              {observation}
+                            </li>
+                          )
+                        )}
                       </ul>
                     </div>
-                    
+
                     <div>
-                      <h5 className="font-medium text-neutral-text mb-2">Clinical Recommendations</h5>
+                      <h5 className="font-medium text-neutral-text mb-2">
+                        Clinical Recommendations
+                      </h5>
                       <ul className="list-disc pl-5 space-y-1">
-                        {imagingAnalysis.analysis?.recommendations?.map((recommendation, index) => (
-                          <li key={index} className="body-small text-neutral-text-secondary">{recommendation}</li>
-                        ))}
+                        {imagingAnalysis.analysis?.recommendations?.map(
+                          (recommendation, index) => (
+                            <li
+                              key={index}
+                              className="body-small text-neutral-text-secondary"
+                            >
+                              {recommendation}
+                            </li>
+                          )
+                        )}
                       </ul>
                     </div>
                   </div>
@@ -690,20 +912,27 @@ const Results = () => {
       {/* Advanced Agent Results */}
       <div className="mb-8">
         <div className="card-header mb-4">
-          <h2 className="h2 text-neutral-text">Advanced Clinical Decision Support</h2>
+          <h2 className="h2 text-neutral-text">
+            Advanced Clinical Decision Support
+          </h2>
           <p className="body-large text-neutral-text-secondary mt-2">
-            Comprehensive treatment planning, follow-up care, and safety assessments
+            Comprehensive treatment planning, follow-up care, and safety
+            assessments
           </p>
         </div>
-        <AdvancedAgentResults 
+        <AdvancedAgentResults
           taskId={taskId}
           patientData={result?.result?.patient_data}
           symptomsAnalysis={symptomsAnalysis}
           riskAssessment={riskAssessment}
-          treatmentRecommendations={finalRecommendation?.treatment_recommendations}
+          treatmentRecommendations={
+            finalRecommendation?.treatment_recommendations
+          }
           followupPlan={finalRecommendation?.followup_plan}
           drugInteractions={finalRecommendation?.drug_interactions}
-          specialistRecommendations={finalRecommendation?.specialist_recommendations}
+          specialistRecommendations={
+            finalRecommendation?.specialist_recommendations
+          }
           qualityAssessment={finalRecommendation?.quality_assessment}
         />
       </div>
@@ -716,15 +945,19 @@ const Results = () => {
             Interactive charts and visual representations of clinical data
           </p>
         </div>
-        <ClinicalVisualizations 
+        <ClinicalVisualizations
           taskId={taskId}
           patientData={result?.result?.patient_data}
           symptomsAnalysis={symptomsAnalysis}
           riskAssessment={riskAssessment}
-          treatmentRecommendations={finalRecommendation?.treatment_recommendations}
+          treatmentRecommendations={
+            finalRecommendation?.treatment_recommendations
+          }
           followupPlan={finalRecommendation?.followup_plan}
           drugInteractions={finalRecommendation?.drug_interactions}
-          specialistRecommendations={finalRecommendation?.specialist_recommendations}
+          specialistRecommendations={
+            finalRecommendation?.specialist_recommendations
+          }
         />
       </div>
 
@@ -736,19 +969,27 @@ const Results = () => {
         <div className="card-body">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <p className="body-small text-neutral-text-secondary">Report ID</p>
+              <p className="body-small text-neutral-text-secondary">
+                Report ID
+              </p>
               <p className="font-mono body-large text-neutral-text">{taskId}</p>
             </div>
             <div>
-              <p className="body-small text-neutral-text-secondary">Assessment Status</p>
+              <p className="body-small text-neutral-text-secondary">
+                Assessment Status
+              </p>
               <span className="badge badge-success flex items-center">
                 <FaCheck className="mr-1" />
                 Completed
               </span>
             </div>
             <div>
-              <p className="body-small text-neutral-text-secondary">Analysis Timestamp</p>
-              <p className="body-large text-neutral-text">{new Date().toLocaleString()}</p>
+              <p className="body-small text-neutral-text-secondary">
+                Analysis Timestamp
+              </p>
+              <p className="body-large text-neutral-text">
+                {new Date().toLocaleString()}
+              </p>
             </div>
           </div>
         </div>
@@ -756,17 +997,11 @@ const Results = () => {
 
       {/* Action Buttons */}
       <div className="mt-8 flex flex-col sm:flex-row sm:justify-center gap-4 print:hidden">
-        <button 
-          onClick={handleStartNewTriage}
-          className="btn btn-primary"
-        >
+        <button onClick={handleStartNewTriage} className="btn btn-primary">
           <FaUserMd className="mr-2" />
           Start New Triage Assessment
         </button>
-        <button 
-          onClick={handlePrintReport}
-          className="btn btn-secondary"
-        >
+        <button onClick={handlePrintReport} className="btn btn-secondary">
           <FaPrint className="mr-2" />
           Print Clinical Report
         </button>
