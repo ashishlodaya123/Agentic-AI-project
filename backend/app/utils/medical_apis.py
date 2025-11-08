@@ -173,6 +173,127 @@ def get_who_data(condition: str):
             "data_available": False
         }
 
+def search_serper(query: str):
+    """
+    Search medical conditions and diagnoses using Serper API.
+    This provides dynamic diagnosis generation based on symptoms.
+    """
+    api_key = getattr(settings, 'SERPER_API_KEY', None)
+    if not api_key:
+        return {"error": "Serper API key not configured"}
+    
+    try:
+        # Serper API endpoint for Google search
+        url = "https://google.serper.dev/search"
+        
+        payload = {
+            "q": f"medical diagnosis symptoms {query}",
+            "num": 10
+        }
+        headers = {
+            'X-API-KEY': api_key,
+            'Content-Type': 'application/json'
+        }
+        
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Extract relevant medical information
+        results = []
+        if 'organic' in data:
+            for item in data['organic']:
+                title = item.get('title', '')
+                snippet = item.get('snippet', '')
+                # Only include results that seem medically relevant
+                if any(keyword in title.lower() or keyword in snippet.lower() 
+                       for keyword in ['symptom', 'diagnosis', 'medical', 'condition', 'disease', 'treatment']):
+                    results.append({
+                        "title": title,
+                        "snippet": snippet,
+                        "link": item.get('link', ''),
+                        "match_score": 7.0  # Give a reasonable default score
+                    })
+        
+        return {
+            "status": "success",
+            "query": query,
+            "results": results,
+            "count": len(results)
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": f"Failed to search Serper: {str(e)}",
+            "query": query
+        }
+
+from typing import Optional, List
+
+def search_nlm_conditions(symptoms: str):
+    """
+    Search medical conditions using NLM Conditions API.
+    This provides accurate condition matching based on symptoms.
+    """
+    try:
+        # NLM Conditions API endpoint
+        base_url = "https://clinicaltables.nlm.nih.gov/api/conditions/v3/search"
+        
+        # Prepare query parameters
+        params = {
+            "terms": symptoms,
+            "maxList": 10
+        }
+        
+        # Make the request to NLM Conditions API with proper headers
+        headers = {
+            "User-Agent": "AgenticClinicalDecisionAssistant/1.0 (Python requests)"
+        }
+        
+        # Make the request to NLM Conditions API
+        response = requests.get(base_url, params=params, headers=headers, timeout=15)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Extract relevant medical information
+        results = []
+        # The NLM API returns data in format: [total_count, codes, names, conditions]
+        if len(data) >= 4 and data[3]:  # Check if we have conditions data
+            conditions = data[3]  # The conditions are in the 4th element
+            codes = data[1] if len(data) > 1 and data[1] else []  # The codes are in the 2nd element
+            
+            for i, condition in enumerate(conditions):
+                if isinstance(condition, list) and len(condition) > 0:
+                    # Extract condition name (first element)
+                    condition_name = condition[0]
+                    
+                    # Try to get code if available
+                    code = ""
+                    if codes and i < len(codes):
+                        code = codes[i]
+                    
+                    results.append({
+                        "title": condition_name,
+                        "snippet": f"Medical condition: {condition_name}",
+                        "code": code,
+                        "match_score": 9.0 - (i * 0.5)  # Decreasing score based on position
+                    })
+        
+        return {
+            "status": "success",
+            "query": symptoms,
+            "results": results,
+            "count": len(results)
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": f"Failed to search NLM Conditions: {str(e)}",
+            "query": symptoms
+        }
+
 # Example of how these functions could be integrated into the RAG agent
 def enhance_rag_with_external_data(query: str):
     """
@@ -182,7 +303,9 @@ def enhance_rag_with_external_data(query: str):
         "query": query,
         "medline_results": search_medline(query),
         "cdc_data": get_cdc_data(query),
-        "who_data": get_who_data(query)
+        "who_data": get_who_data(query),
+        "serper_data": search_serper(query),  # Add Serper data
+        "nlm_conditions_data": search_nlm_conditions(query)  # Add NLM Conditions data
     }
     
     return enhanced_data

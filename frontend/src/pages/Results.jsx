@@ -52,6 +52,23 @@ const Results = () => {
   });
   const [isEditing, setIsEditing] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [forceRefresh, setForceRefresh] = useState(false);
+  
+  // Check if we have old hardcoded data - moved to proper location
+  useEffect(() => {
+    if (result?.result?.final_recommendation?.differential_diagnosis) {
+      const diagnoses = result.result.final_recommendation.differential_diagnosis;
+      // Check if diagnoses is an array and has items
+      if (Array.isArray(diagnoses) && diagnoses.length > 0) {
+        // Check if any diagnosis has very low match scores (indicating old hardcoded data)
+        const hasLowScores = diagnoses.some(d => d.match_score < 5);
+        if (hasLowScores) {
+          console.log("Detected old hardcoded data, forcing refresh");
+          setForceRefresh(true);
+        }
+      }
+    }
+  }, [result]);
 
   useEffect(() => {
     // Try to load cached result first
@@ -61,8 +78,22 @@ const Results = () => {
     if (cachedResult) {
       try {
         initialResult = JSON.parse(cachedResult);
-        setResult(initialResult);
-        setLoading(false);
+        console.log("Loaded cached result:", initialResult);
+        // Check if this is old cached data with hardcoded results
+        if (initialResult?.result?.final_recommendation?.differential_diagnosis) {
+          const diagnoses = initialResult.result.final_recommendation.differential_diagnosis;
+          // Check if any diagnosis has very low match scores (indicating old hardcoded data)
+          const hasLowScores = diagnoses.some(d => d.match_score < 5);
+          if (hasLowScores) {
+            console.log("Detected old cached data with hardcoded results, clearing cache");
+            localStorage.removeItem(`triage_result_${taskId}`);
+            initialResult = null;
+          }
+        }
+        if (initialResult) {
+          setResult(initialResult);
+          setLoading(false);
+        }
       } catch (e) {
         console.error("Error parsing cached result:", e);
       }
@@ -81,6 +112,7 @@ const Results = () => {
               `triage_result_${taskId}`,
               JSON.stringify(resultToCache)
             );
+            console.log("Received fresh result from backend:", response.data.result);
             setResult(response.data.result);
             setLoading(false);
             clearInterval(pollResult);
@@ -301,6 +333,12 @@ const Results = () => {
   const ragResults = finalRecommendation.clinical_guidelines || [];
   const imagingAnalysis = finalRecommendation.imaging_analysis || {};
   const riskAssessment = finalRecommendation.risk_assessment || {};
+  
+  // Log the data for debugging
+  console.log("Final Recommendation:", finalRecommendation);
+  console.log("Symptoms Analysis:", symptomsAnalysis);
+  console.log("Risk Assessment:", riskAssessment);
+  console.log("Patient Data:", result?.result?.patient_data);
 
   const getUrgencyConfig = (urgencyLevel) => {
     switch (urgencyLevel?.toLowerCase()) {

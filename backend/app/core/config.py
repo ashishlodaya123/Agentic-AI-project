@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     WHO_API_KEY: Optional[str] = None
     NIH_API_KEY: Optional[str] = None
     MEDICAL_IMAGING_API_KEY: Optional[str] = None
+    SERPER_API_KEY: Optional[str] = None  # Add Serper API key support
+    # NLM Conditions API requires no API key
     
     # Enable/disable external API calls
     ENABLE_EXTERNAL_APIS: bool = True

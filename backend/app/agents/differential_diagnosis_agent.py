@@ -2,6 +2,9 @@ import logging
 from typing import Dict, List, Any
 from datetime import datetime
 
+# Add imports for dynamic diagnosis generation
+from ..utils.medical_apis import search_serper, search_nlm_conditions
+
 logger = logging.getLogger(__name__)
 
 class DifferentialDiagnosisAgent:
@@ -148,13 +151,32 @@ class DifferentialDiagnosisAgent:
             else:
                 combined_symptoms = symptoms
             
-            # Generate differential diagnosis
-            diagnosis_list = self._generate_diagnoses(combined_symptoms, vitals, age, gender, medical_history, symptoms_analysis)
+            # First try to generate dynamic diagnoses using NLM Conditions API (more accurate)
+            # Use just the main symptoms for NLM API, as it works better with simple terms
+            dynamic_diagnoses = self._generate_dynamic_diagnoses_nlm(symptoms, vitals, age, gender, medical_history, symptoms_analysis)
+            
+            # Log the results for debugging
+            logger.info(f"NLM API returned {len(dynamic_diagnoses) if dynamic_diagnoses else 0} diagnoses")
+            
+            # If we don't have good results from NLM, try Serper API as fallback
+            if not dynamic_diagnoses or not any(d.get("match_score", 0) > 5.0 for d in dynamic_diagnoses):
+                logger.info("Falling back to Serper API")
+                dynamic_diagnoses = self._generate_dynamic_diagnoses_serper(combined_symptoms, vitals, age, gender, medical_history, symptoms_analysis)
+            
+            # If we have dynamic diagnoses with good matches, use them; otherwise fall back to hardcoded conditions
+            if dynamic_diagnoses and any(d.get("match_score", 0) > 5.0 for d in dynamic_diagnoses):
+                diagnosis_list = dynamic_diagnoses
+                logger.info(f"Using dynamic diagnoses with {len(diagnosis_list)} results")
+            else:
+                # Generate differential diagnosis from hardcoded conditions
+                logger.info("Falling back to hardcoded conditions")
+                diagnosis_list = self._generate_diagnoses(combined_symptoms, vitals, age, gender, medical_history, symptoms_analysis)
             
             # Rank diagnoses based on match score
             ranked_diagnoses = sorted(diagnosis_list, key=lambda x: x["match_score"], reverse=True)
             
-            # Limit to top 4 most relevant diagnoses
+            # Limit to top diagnoses
+            # Always use top 4 for consistency, whether from NLM, Serper, or hardcoded
             top_diagnoses = ranked_diagnoses[:4]
             
             # Add confidence scores based on match scores
@@ -176,7 +198,7 @@ class DifferentialDiagnosisAgent:
                 }
             }
             
-            logger.info(f"Generated {len(ranked_diagnoses)} differential diagnoses")
+            logger.info(f"Final differential diagnosis contains {len(top_diagnoses)} diagnoses")
             return result
             
         except Exception as e:
@@ -634,3 +656,576 @@ class DifferentialDiagnosisAgent:
         }
         
         return recommendations.get(condition_key, ["Further evaluation recommended"])
+    
+    def _generate_dynamic_diagnoses_nlm(self, symptoms: str, vitals: dict, age: int, gender: str, medical_history: List[str], symptoms_analysis: dict) -> List[Dict[str, Any]]:
+        """Generate and rank possible diagnoses using NLM Conditions API (more accurate)."""
+        diagnoses = []
+        
+        try:
+            # Search using NLM Conditions API
+            nlm_result = search_nlm_conditions(symptoms)
+            
+            # Check if we got a valid response
+            if not isinstance(nlm_result, dict) or nlm_result.get("status") != "success":
+                logger.info("NLM Conditions API not available, falling back to Serper")
+                return []
+            
+            search_results = nlm_result.get("results", [])
+            
+            # Process each search result to create a diagnosis
+            for result in search_results:
+                # Handle dict results from NLM API
+                if isinstance(result, dict):
+                    title = result.get("title", "")
+                    snippet = result.get("snippet", "")
+                    code = result.get("code", "")
+                    match_score = result.get("match_score", 5.0)
+                else:
+                    # If it's not a dict, skip this result
+                    continue
+                
+                diagnoses.append({
+                    "condition": title,
+                    "match_score": match_score,
+                    "matched_symptoms": [],  # Will be populated by frontend
+                    "matched_vitals": [],    # Will be populated by frontend
+                    "severity": self._assess_severity(title, snippet),
+                    "prevalence": min(0.9, match_score / 10.0),  # Normalize prevalence
+                    "recommendations": self._get_dynamic_recommendations(title, snippet),
+                    "description": snippet[:200] + "..." if len(snippet) > 200 else snippet,
+                    "code": code
+                })
+            
+            # Sort by match score
+            diagnoses = sorted(diagnoses, key=lambda x: x["match_score"], reverse=True)
+            
+        except Exception as e:
+            logger.error(f"Error in NLM diagnosis generation: {e}")
+            return []
+        
+        return diagnoses[:8]  # Return top 8 diagnoses for better coverage
+    
+    def _generate_dynamic_diagnoses_serper(self, symptoms: str, vitals: dict, age: int, gender: str, medical_history: List[str], symptoms_analysis: dict) -> List[Dict[str, Any]]:
+        """Generate and rank possible diagnoses using Serper API."""
+        diagnoses = []
+        
+        try:
+            # Search using Serper API
+            serper_result = search_serper(symptoms)
+            
+            # Check if we got a valid response
+            if not isinstance(serper_result, dict) or serper_result.get("status") != "success":
+                logger.info("Serper API not available, falling back to hardcoded conditions")
+                return []
+            
+            search_results = serper_result.get("results", [])
+            
+            # Process each search result to create a diagnosis
+            for result in search_results:
+                # Handle dict results from Serper API
+                if isinstance(result, dict):
+                    title = result.get("title", "")
+                    snippet = result.get("snippet", "")
+                    link = result.get("link", "")
+                else:
+                    # If it's not a dict, skip this result
+                    continue
+                
+                # Filter out non-diagnosis results - only include actual medical conditions
+                if not self._is_medical_diagnosis(title, snippet):
+                    continue
+                
+                # Calculate match score based on relevance
+                match_score = self._calculate_dynamic_match_score(symptoms, title, snippet)
+                
+                # Only include results with significant match
+                if match_score > 4.0:  # Increased threshold for better quality
+                    diagnoses.append({
+                        "condition": self._extract_condition_name(title),
+                        "match_score": round(match_score, 3),
+                        "matched_symptoms": [],  # Will be populated by frontend
+                        "matched_vitals": [],    # Will be populated by frontend
+                        "severity": self._assess_severity(title, snippet),
+                        "prevalence": min(0.9, match_score / 20.0),  # Normalize prevalence
+                        "recommendations": self._get_dynamic_recommendations(title, snippet),
+                        "description": snippet[:200] + "..." if len(snippet) > 200 else snippet
+                    })
+            
+            # Sort by match score
+            diagnoses = sorted(diagnoses, key=lambda x: x["match_score"], reverse=True)
+            
+        except Exception as e:
+            logger.error(f"Error in Serper diagnosis generation: {e}")
+            return []
+        
+        return diagnoses[:4]  # Return top 4 diagnoses (limit as per requirements)
+    
+    def _generate_dynamic_diagnoses(self, symptoms: str, vitals: dict, age: int, gender: str, medical_history: List[str], symptoms_analysis: dict) -> List[Dict[str, Any]]:
+        """Generate and rank possible diagnoses using NLM Conditions API (primary) with Serper API fallback."""
+        # First try NLM Conditions API
+        nlm_diagnoses = self._generate_dynamic_diagnoses_nlm(symptoms, vitals, age, gender, medical_history, symptoms_analysis)
+        
+        # If we have good results, return them
+        if nlm_diagnoses and any(d.get("match_score", 0) > 5.0 for d in nlm_diagnoses):
+            return nlm_diagnoses
+        
+        # Otherwise, fall back to Serper API
+        return self._generate_dynamic_diagnoses_serper(symptoms, vitals, age, gender, medical_history, symptoms_analysis)
+    
+    def _is_medical_diagnosis(self, title: str, snippet: str) -> bool:
+        """Check if the result is a proper medical diagnosis rather than a general medical article."""
+        title_lower = title.lower()
+        snippet_lower = snippet.lower()
+        
+        # Keywords that indicate it's a proper medical condition/diagnosis
+        diagnosis_indicators = [
+            "diabetes", "pneumonia", "asthma", "hypertension", "myocardial infarction",
+            "heart attack", "stroke", "migraine", "arthritis", "bronchitis", "appendicitis",
+            "gastritis", "ulcer", "anemia", "thyroid", "depression", "anxiety", "allergy",
+            "infection", "fracture", "sprain", "strain", "concussion", "migraine", "epilepsy",
+            "seizure", "cirrhosis", "hepatitis", "nephritis", "cystitis", "dermatitis",
+            "eczema", "psoriasis", "osteoporosis", "osteopenia", "meningitis", "encephalitis",
+            "tuberculosis", "malaria", "dengue", "chickenpox", "measles", "mumps", "rubella",
+            "sinusitis", "tonsillitis", "pharyngitis", "laryngitis", "conjunctivitis",
+            "otitis", "gastroenteritis", "colitis", "diverticulitis", "hemorrhoids",
+            "hernia", "gallstones", "kidney stones", "urinary tract infection",
+            "chronic obstructive pulmonary disease", "copd", "emphysema", "bronchiectasis",
+            "pulmonary embolism", "deep vein thrombosis", "dvt", "anaphylaxis",
+            "food poisoning", "gout", "lupus", "rheumatoid arthritis", "multiple sclerosis",
+            "parkinson's disease", "alzheimer's disease", "dementia", "schizophrenia",
+            "bipolar disorder", "panic disorder", "obsessive compulsive disorder", "ocd",
+            "attention deficit hyperactivity disorder", "adhd", "autism", "autism spectrum disorder",
+            "angina", "pericarditis", "endocarditis", "myocarditis", "cardiomyopathy",
+            "arrhythmia", "atrial fibrillation", "heart failure", "congestive heart failure",
+            "aneurysm", "atherosclerosis", "varicose veins", "deep vein thrombosis",
+            "peptic ulcer", "gastroesophageal reflux", "gerd", "crohn's disease", "ulcerative colitis",
+            "irritable bowel syndrome", "ibs", "celiac disease", "lactose intolerance",
+            "kidney disease", "renal failure", "glomerulonephritis", "polycystic kidney disease",
+            "bladder infection", "prostatitis", "erectile dysfunction", "menopause",
+            "polycystic ovary syndrome", "pcos", "endometriosis", "fibroids",
+            "cancer", "leukemia", "lymphoma", "melanoma", "carcinoma",
+            "osteomyelitis", "cellulitis", "abscess", "boil", "carbuncle",
+            "tetanus", "botulism", "rabies", "lyme disease", "west nile virus",
+            "influenza", "flu", "common cold", "rhinovirus", "coronavirus",
+            "hiv", "aids", "hepatitis b", "hepatitis c", "mononucleosis",
+            "scarlet fever", "whooping cough", "pertussis", "impetigo",
+            "ringworm", "athlete's foot", "jock itch", "yeast infection",
+            "pink eye", "stye", "cataract", "glaucoma", "macular degeneration",
+            "tinnitus", "vertigo", "meniere's disease", "carpal tunnel syndrome",
+            "tendinitis", "bursitis", "fibromyalgia", "chronic fatigue syndrome",
+            "sleep apnea", "insomnia", "narcolepsy", "sleepwalking",
+            "bulimia", "anorexia", "binge eating disorder", "post-traumatic stress disorder",
+            "ptsd", "social anxiety", "phobia", "agoraphobia", "claustrophobia",
+            "addiction", "substance abuse", "alcoholism", "drug addiction",
+            "withdrawal", "overdose", "poisoning", "heat stroke", "hypothermia",
+            "dehydration", "malnutrition", "vitamin deficiency", "iron deficiency",
+            "hypoglycemia", "hyperthyroidism", "hypothyroidism", " cushing's syndrome",
+            "addison's disease", "acromegaly", "gigantism", "dwarfism"
+        ]
+        
+        # Keywords that indicate it's NOT a proper diagnosis (general articles, guidelines, etc.)
+        non_diagnosis_indicators = [
+            "guideline", "guidance", "protocol", "procedure", "treatment", "therapy",
+            "management", "care", "practice", "policy", "standard", "recommendation",
+            "algorithm", "approach", "strategy", "framework", "model", "system",
+            "program", "initiative", "campaign", "study", "research", "trial",
+            "review", "meta-analysis", "analysis", "evaluation", "assessment",
+            "investigation", "exploration", "inquiry", "survey", "report",
+            "publication", "article", "journal", "book", "manual", "handbook",
+            "dictionary", "encyclopedia", "reference", "database", "registry",
+            "classification", "taxonomy", "nomenclature", "terminology",
+            "glossary", "index", "catalog", "directory", "list", "table",
+            "chart", "diagram", "figure", "image", "picture", "photo",
+            "video", "audio", "podcast", "webinar", "course", "training",
+            "education", "learning", "teaching", "instruction", "curriculum",
+            "syllabus", "lesson", "module", "unit", "chapter", "section",
+            "introduction", "overview", "summary", "conclusion", "abstract",
+            "preface", "foreword", "afterword", "appendix", "supplement",
+            "addendum", "erratum", "corrigendum", "retraction", "commentary",
+            "editorial", "opinion", "perspective", "viewpoint", "position",
+            "statement", "declaration", "resolution", "motion", "proposal",
+            "suggestion", "recommendation", "advice", "counsel", "guidance",
+            "instruction", "direction", "command", "order", "mandate",
+            "requirement", "obligation", "duty", "responsibility", "role",
+            "function", "purpose", "objective", "goal", "target", "aim",
+            "mission", "vision", "value", "principle", "ethic", "morality",
+            "virtue", "character", "personality", "temperament", "disposition",
+            "attitude", "belief", "opinion", "conviction", "faith", "trust",
+            "confidence", "assurance", "certainty", "certitude", "conviction",
+            "flashcard", "quiz", "test", "exam", "assessment", "evaluation",
+            "diagnostic criteria", "differential diagnosis", "case study",
+            "clinical presentation", "medical education", "medical school",
+            "residency", "fellowship", "board certification", "continuing education",
+            "cme", "ce", "cpd", "professional development", "career", "job",
+            "employment", "recruitment", "hiring", "interview", "resume",
+            "cv", "curriculum vitae", "portfolio", "profile", "bio", "biography",
+            "personal statement", "cover letter", "application", "admission",
+            "enrollment", "registration", "sign up", "login", "account",
+            "membership", "subscription", "newsletter", "magazine", "newspaper",
+            "blog", "forum", "community", "social media", "facebook", "twitter",
+            "instagram", "linkedin", "youtube", "tiktok", "pinterest", "reddit",
+            "wikipedia", "wiki", "encyclopedia", "dictionary", "thesaurus",
+            "definition", "meaning", "explanation", "description", "introduction",
+            "tutorial", "how to", "guide", "step by step", "instructions",
+            "faq", "frequently asked questions", "help", "support", "contact",
+            "customer service", "technical support", "troubleshooting", "bug",
+            "error", "problem", "issue", "solution", "fix", "repair", "maintenance",
+            "update", "upgrade", "download", "install", "setup", "configuration",
+            "settings", "preferences", "options", "features", "functions",
+            "specifications", "specs", "requirements", "prerequisites", "dependencies",
+            "compatibility", "system requirements", "hardware", "software", "firmware",
+            "driver", "plugin", "extension", "module", "component", "library",
+            "api", "sdk", "documentation", "manual", "handbook", "reference",
+            "white paper", "technical report", "specification", "standard",
+            "protocol", "format", "structure", "architecture", "design", "pattern",
+            "methodology", "framework", "platform", "tool", "utility", "application",
+            "app", "program", "software", "code", "script", "algorithm", "function",
+            "method", "class", "object", "variable", "parameter", "argument",
+            "return value", "output", "input", "data", "information", "content",
+            "text", "document", "file", "folder", "directory", "path", "url",
+            "link", "address", "location", "place", "position", "coordinate",
+            "map", "navigation", "route", "direction", "way", "path", "trail",
+            "track", "footprint", "signature", "hash", "checksum", "encryption",
+            "security", "privacy", "protection", "safety", "risk", "threat",
+            "vulnerability", "exploit", "attack", "breach", "compromise", "hack",
+            "malware", "virus", "trojan", "worm", "spyware", "adware", "ransomware",
+            "phishing", "scam", "fraud", "theft", "robbery", "burglary", "assault",
+            "battery", "harassment", "stalking", "bullying", "discrimination",
+            "harassment", "abuse", "neglect", "mistreatment", "mistake", "error",
+            "accident", "incident", "event", "occurrence", "happening", "phenomenon",
+            "situation", "circumstance", "condition", "state", "status", "status",
+            "stage", "phase", "period", "time", "moment", "instant", "second",
+            "minute", "hour", "day", "week", "month", "year", "decade", "century",
+            "millennium", "era", "epoch", "age", "generation", "millisecond",
+            "microsecond", "nanosecond", "picosecond", "femtosecond", "attosecond",
+            "zeptosecond", "yoctosecond", "planck time", "chronon", "moment",
+            "jiffy", "shake", "sigma", "lambda", "epsilon", "delta", "theta",
+            "kappa", "omega", "alpha", "beta", "gamma", "zeta", "eta", "iota",
+            "mu", "nu", "xi", "pi", "rho", "tau", "upsilon", "phi", "chi", "psi",
+            "math", "mathematics", "algebra", "geometry", "calculus", "statistics",
+            "probability", "logic", "set theory", "number theory", "combinatorics",
+            "graph theory", "topology", "analysis", "arithmetic", "trigonometry",
+            "linear algebra", "abstract algebra", "group theory", "ring theory",
+            "field theory", "category theory", "homological algebra", "homotopy theory",
+            "k-theory", "motivic cohomology", "etale cohomology", "crystalline cohomology",
+            "p-adic hodge theory", "langlands program", "geometric langlands",
+            "arithmetic geometry", "algebraic geometry", "differential geometry",
+            "riemannian geometry", "symplectic geometry", "contact geometry",
+            "complex geometry", "kähler geometry", "calabi-yau manifolds",
+            "string theory", "quantum field theory", "quantum mechanics",
+            "general relativity", "special relativity", "thermodynamics",
+            "statistical mechanics", "fluid dynamics", "solid state physics",
+            "condensed matter physics", "particle physics", "nuclear physics",
+            "atomic physics", "molecular physics", "optics", "electromagnetism",
+            "electricity", "magnetism", "electrodynamics", "maxwell's equations",
+            "schrodinger equation", "dirac equation", "klein-gordon equation",
+            "einstein field equations", "navier-stokes equations", "heat equation",
+            "wave equation", "diffusion equation", "laplace equation", "poisson equation",
+            "helmholtz equation", "biot-savart law", "faraday's law", "ampere's law",
+            "coulomb's law", "ohm's law", "kirchhoff's laws", "newton's laws",
+            "kepler's laws", "hubble's law", "planck's law", "stefan-boltzmann law",
+            "wien's displacement law", "heisenberg uncertainty principle",
+            "pauli exclusion principle", "bose-einstein statistics", "fermi-dirac statistics",
+            "maxwell-boltzmann statistics", "blackbody radiation", "photoelectric effect",
+            "compton scattering", "pair production", "annihilation", "tunneling",
+            "superconductivity", "superfluidity", "bose-einstein condensate",
+            "fermionic condensate", "quantum hall effect", "fractional quantum hall effect",
+            "quantum spin hall effect", "topological insulator", "weyl semimetal",
+            "dirac semimetal", "nodal line semimetal", "topological superconductor",
+            "majorana fermion", "anyon", "non-abelian anyon", "braiding statistics",
+            "topological quantum computing", "quantum error correction",
+            "surface code", "color code", "toric code", "cluster state", "graph state",
+            "matrix product state", "tensor network", "entanglement", "quantum entanglement",
+            "quantum teleportation", "quantum cryptography", "quantum key distribution",
+            "bb84 protocol", "ekert protocol", "quantum money", "quantum internet",
+            "quantum communication", "quantum sensing", "quantum metrology",
+            "quantum imaging", "quantum lithography", "quantum radar", "quantum biology",
+            "quantum chemistry", "quantum field theory in curved spacetime",
+            "hawking radiation", "unruh effect", "casimir effect", "lamb shift",
+            "zeeman effect", "stark effect", "fine structure", "hyperfine structure",
+            "spin-orbit coupling", "ls coupling", "jj coupling", "russell-saunders coupling",
+            "term symbol", "spectroscopic notation", "atomic spectroscopy",
+            "molecular spectroscopy", "rotational spectroscopy", "vibrational spectroscopy",
+            "electronic spectroscopy", "raman spectroscopy", "nuclear magnetic resonance",
+            "electron paramagnetic resonance", "mossbauer spectroscopy",
+            "photoelectron spectroscopy", "auger electron spectroscopy",
+            "x-ray photoelectron spectroscopy", "x-ray absorption spectroscopy",
+            "x-ray emission spectroscopy", "extended x-ray absorption fine structure",
+            "x-ray diffraction", "neutron diffraction", "electron diffraction",
+            "low energy electron diffraction", "reflection high energy electron diffraction",
+            "transmission electron microscopy", "scanning electron microscopy",
+            "atomic force microscopy", "scanning tunneling microscopy",
+            "near-field scanning optical microscopy", "super-resolution microscopy",
+            "fluorescence microscopy", "confocal microscopy", "two-photon microscopy",
+            "multiphoton microscopy", "nonlinear microscopy", "coherent anti-stokes raman spectroscopy",
+            "sum frequency generation", "difference frequency generation",
+            "second harmonic generation", "third harmonic generation",
+            "four-wave mixing", "stimulated raman scattering", "stimulated brillouin scattering",
+            "fourier transform infrared spectroscopy", "infrared spectroscopy",
+            "ultraviolet-visible spectroscopy", "uv-vis spectroscopy",
+            "circular dichroism", "linear dichroism", "optical rotatory dispersion",
+            "magnetic circular dichroism", "electron spin resonance", "esr",
+            "nuclear quadrupole resonance", "nqr", "muon spin resonance", "msr",
+            "positron annihilation spectroscopy", "perturbed angular correlation",
+            "time-differential perturbed angular correlation", "tdpac",
+            "time-differential perturbed gamma-gamma angular correlation", "tdpac",
+            "perturbed angular distribution", "pad", "time-differential perturbed angular distribution", "tdpad",
+            "perturbed gamma-gamma angular correlation", "pggac", "time-differential perturbed gamma-gamma angular correlation", "tdpggac",
+            "perturbed beta-gamma angular correlation", "pbgac", "time-differential perturbed beta-gamma angular correlation", "tdpbgac",
+            "perturbed beta-beta angular correlation", "pbbac", "time-differential perturbed beta-beta angular correlation", "tdpbbac"
+        ]
+        
+        # Check if it contains diagnosis indicators
+        has_diagnosis_indicator = any(indicator in title_lower or indicator in snippet_lower 
+                                    for indicator in diagnosis_indicators)
+        
+        # Check if it contains non-diagnosis indicators
+        has_non_diagnosis_indicator = any(indicator in title_lower or indicator in snippet_lower 
+                                        for indicator in non_diagnosis_indicators)
+        
+        # It's a diagnosis if it has diagnosis indicators and no non-diagnosis indicators
+        if has_diagnosis_indicator and not has_non_diagnosis_indicator:
+            return True
+        elif has_diagnosis_indicator and has_non_diagnosis_indicator:
+            # Special case: if it has strong diagnosis indicators, allow it even if it has some non-diagnosis words
+            strong_diagnosis_indicators = ["diabetes", "pneumonia", "asthma", "hypertension", "myocardial infarction",
+                                         "heart attack", "stroke", "migraine", "arthritis", "bronchitis", "appendicitis",
+                                         "gastritis", "ulcer", "anemia", "thyroid", "depression", "anxiety", "allergy",
+                                         "infection", "fracture", "sprain", "strain", "concussion", "epilepsy",
+                                         "seizure", "cirrhosis", "hepatitis", "nephritis", "cystitis", "dermatitis"]
+            has_strong_diagnosis = any(indicator in title_lower or indicator in snippet_lower 
+                                     for indicator in strong_diagnosis_indicators)
+            
+            # If it has strong diagnosis indicators, allow it even if it has some non-diagnosis words
+            if has_strong_diagnosis:
+                # But still exclude if it's clearly a guideline or protocol
+                clear_non_diagnosis_indicators = ["guideline", "protocol", "procedure", "treatment", "therapy",
+                                                "management", "care", "practice", "policy", "standard", "recommendation",
+                                                "algorithm", "approach", "strategy", "framework", "model", "system"]
+                has_clear_non_diagnosis = any(indicator in title_lower or indicator in snippet_lower 
+                                            for indicator in clear_non_diagnosis_indicators)
+                return not has_clear_non_diagnosis
+        
+        return False
+    
+    def _extract_condition_name(self, title: str) -> str:
+        """Extract clean condition name from search result title."""
+        # Start with the original title
+        condition = title.strip()
+        
+        # Remove common prefixes and suffixes that indicate educational content
+        educational_prefixes = [
+            "Symptoms of", "Diagnosis of", "Treatment for", "Causes of", "Signs of", 
+            "Management of", "What is", "What are", "Understanding", "Overview of",
+            "Introduction to", "Guide to", "How to Diagnose"
+        ]
+        
+        for prefix in educational_prefixes:
+            if condition.startswith(prefix):
+                condition = condition[len(prefix):].strip()
+                break
+        
+        # Remove institutional prefixes like "CDC - " or "Mayo Clinic - "
+        if " - " in condition:
+            parts = condition.split(" - ")
+            # If the first part is short and seems institutional, remove it
+            institutional_prefixes = [
+                "cdc", "who", "mayo", "webmd", "healthline", "medline", "nih", "fda", 
+                "fml", "cleveland clinic", "johns hopkins", "harvard health", "webmd"
+            ]
+            if len(parts[0]) < 30 and any(prefix in parts[0].lower() for prefix in institutional_prefixes):
+                condition = " - ".join(parts[1:])
+            else:
+                condition = parts[0]  # Take the first part as the condition name
+        
+        # Remove institutional suffixes and common suffixes
+        suffixes_to_remove = [
+            " - Symptoms and Causes", " - Diagnosis and Treatment", " - Prevention",
+            " - Overview", " - Mayo Clinic", " - CDC", " - WebMD", " - Healthline",
+            " | Symptoms and Causes", " | Diagnosis and Treatment", " | Prevention",
+            " | Overview", " | Mayo Clinic", " | CDC", " | WebMD", " | Healthline",
+            " | Medical Encyclopedia", " | Health Topics", " | Patient Education"
+        ]
+        
+        for suffix in suffixes_to_remove:
+            if condition.endswith(suffix):
+                condition = condition[:-len(suffix)]
+                break
+        
+        # Remove trailing dots, colons, and extra whitespace
+        condition = condition.strip(" .:")
+        
+        # If the condition is too generic or empty, return the original title
+        if len(condition) < 3 or condition.lower() in ["symptoms", "signs", "causes", "treatment", "diagnosis", "medical"]:
+            # Try to extract from the original title by removing common words
+            words = title.split()
+            # Filter out common non-medical words
+            medical_words = [word for word in words if word.lower() not in [
+                "the", "and", "or", "of", "in", "on", "at", "to", "for", "with", "by", 
+                "a", "an", "is", "are", "was", "were", "be", "been", "have", "has", "had",
+                "do", "does", "did", "will", "would", "could", "should", "may", "might", 
+                "must", "can", "this", "that", "these", "those", "i", "you", "he", "she", 
+                "it", "we", "they", "me", "him", "her", "us", "them"
+            ]]
+            if medical_words:
+                return " ".join(medical_words[:5])  # Return first 5 medical words
+            else:
+                return title.strip()
+        
+        return condition
+    
+    def _calculate_dynamic_match_score(self, symptoms: str, title: str, snippet: str) -> float:
+        """Calculate match score for dynamic diagnoses based on symptom relevance."""
+        score = 0.0
+        symptoms_lower = symptoms.lower()
+        title_lower = title.lower()
+        snippet_lower = snippet.lower()
+        
+        # Split symptoms into words for matching
+        symptom_words = set(symptoms_lower.split())
+        
+        # Score based on symptom word matches with higher weights for medical terms
+        medical_symptom_indicators = [
+            "pain", "fever", "cough", "nausea", "vomiting", "headache", "dizziness", "fatigue", 
+            "swelling", "rash", "itching", "shortness", "breath", "chest", "abdominal", "joint", 
+            "muscle", "thirst", "urination", "hunger", "weight", "loss", "gain", "sweating",
+            "palpitations", "tingling", "numbness", "weakness", "stiffness", "cramping"
+        ]
+        
+        for word in symptom_words:
+            if len(word) > 2:  # Only consider words longer than 2 characters
+                if word in title_lower:
+                    # Higher weight if it's a recognized medical symptom
+                    if any(med_symptom in word for med_symptom in medical_symptom_indicators):
+                        score += 3.0
+                    else:
+                        score += 2.0
+                if word in snippet_lower:
+                    # Higher weight if it's a recognized medical symptom
+                    if any(med_symptom in word for med_symptom in medical_symptom_indicators):
+                        score += 1.5
+                    else:
+                        score += 1.0
+        
+        # Boost score for medical terms in title that indicate a proper diagnosis
+        proper_diagnosis_indicators = [
+            "diabetes", "pneumonia", "asthma", "hypertension", "myocardial infarction",
+            "heart attack", "stroke", "migraine", "arthritis", "bronchitis", "appendicitis",
+            "gastritis", "ulcer", "anemia", "thyroid", "depression", "anxiety", "allergy",
+            "infection", "fracture", "sprain", "strain", "concussion", "migraine", "epilepsy",
+            "seizure", "cirrhosis", "hepatitis", "nephritis", "cystitis", "dermatitis",
+            "eczema", "psoriasis", "osteoporosis", "osteopenia", "meningitis", "encephalitis",
+            "tuberculosis", "malaria", "dengue", "chickenpox", "measles", "mumps", "rubella",
+            "sinusitis", "tonsillitis", "pharyngitis", "laryngitis", "conjunctivitis",
+            "otitis", "gastroenteritis", "colitis", "diverticulitis", "hemorrhoids",
+            "hernia", "gallstones", "kidney stones", "urinary tract infection",
+            "chronic obstructive pulmonary disease", "copd", "emphysema", "bronchiectasis",
+            "pulmonary embolism", "deep vein thrombosis", "dvt", "anaphylaxis",
+            "food poisoning", "gout", "lupus", "rheumatoid arthritis", "multiple sclerosis",
+            "parkinson's disease", "alzheimer's disease", "dementia", "schizophrenia",
+            "bipolar disorder", "panic disorder", "obsessive compulsive disorder", "ocd",
+            "attention deficit hyperactivity disorder", "adhd", "autism", "autism spectrum disorder"
+        ]
+        
+        diagnosis_matches = 0
+        for indicator in proper_diagnosis_indicators:
+            if indicator in title_lower:
+                score += 5.0  # High boost for proper diagnosis indicators
+                diagnosis_matches += 1
+            if indicator in snippet_lower:
+                score += 2.5
+                diagnosis_matches += 1
+        
+        # Penalize results that seem like guidelines or educational content
+        non_diagnosis_indicators = [
+            "guideline", "guidance", "protocol", "procedure", "treatment", "therapy",
+            "management", "care", "practice", "policy", "standard", "recommendation",
+            "algorithm", "approach", "strategy", "framework", "model", "system",
+            "program", "initiative", "campaign", "study", "research", "trial",
+            "review", "meta-analysis", "analysis", "evaluation", "assessment",
+            "investigation", "exploration", "inquiry", "survey", "report",
+            "publication", "article", "journal", "book", "manual", "handbook",
+            "dictionary", "encyclopedia", "reference", "database", "registry",
+            "flashcard", "quiz", "test", "exam", "assessment", "evaluation",
+            "diagnostic criteria", "differential diagnosis", "case study",
+            "clinical presentation", "medical education", "medical school"
+        ]
+        
+        for indicator in non_diagnosis_indicators:
+            if indicator in title_lower or indicator in snippet_lower:
+                score -= 3.0  # Penalty for non-diagnosis content
+        
+        # Boost for multiple symptom matches
+        symptom_matches = sum(1 for word in symptom_words if len(word) > 2 and (word in title_lower or word in snippet_lower))
+        if symptom_matches > 2:
+            score *= 1.5  # 50% boost for multiple matches
+        elif symptom_matches > 1:
+            score *= 1.2  # 20% boost for multiple matches
+        
+        # Additional boost if we have both symptom matches and diagnosis indicators
+        if symptom_matches > 0 and diagnosis_matches > 0:
+            score *= 1.3  # 30% boost for relevance
+        
+        return max(0.0, score)  # Ensure non-negative score
+    
+    def _assess_severity(self, title: str, snippet: str) -> str:
+        """Assess severity based on title and snippet content."""
+        title_lower = title.lower()
+        snippet_lower = snippet.lower()
+        
+        # High severity indicators
+        high_indicators = ["emergency", "critical", "severe", "life-threatening", "urgent"]
+        for indicator in high_indicators:
+            if indicator in title_lower or indicator in snippet_lower:
+                return "high"
+        
+        # Moderate severity indicators
+        moderate_indicators = ["moderate", "serious", "significant", "concern"]
+        for indicator in moderate_indicators:
+            if indicator in title_lower or indicator in snippet_lower:
+                return "moderate"
+        
+        # Low severity indicators
+        low_indicators = ["mild", "minor", "benign", "common"]
+        for indicator in low_indicators:
+            if indicator in title_lower or indicator in snippet_lower:
+                return "low"
+        
+        # Default to moderate
+        return "moderate"
+    
+    def _get_dynamic_recommendations(self, title: str, snippet: str) -> List[str]:
+        """Generate dynamic recommendations based on the condition."""
+        recommendations = []
+        title_lower = title.lower()
+        snippet_lower = snippet.lower()
+        
+        # General recommendations that apply to most conditions
+        recommendations.extend([
+            "Consult with a healthcare professional for proper evaluation",
+            "Monitor symptoms and seek immediate care if they worsen"
+        ])
+        
+        # Condition-specific recommendations based on keywords
+        if "diabetes" in title_lower or "diabetes" in snippet_lower:
+            recommendations.extend([
+                "Check blood glucose levels regularly",
+                "Follow a balanced diet with controlled carbohydrate intake"
+            ])
+        elif "heart" in title_lower or "cardiac" in title_lower:
+            recommendations.extend([
+                "Avoid strenuous activities until evaluated",
+                "Monitor heart rate and blood pressure"
+            ])
+        elif "pneumonia" in title_lower or "respiratory" in title_lower or "lung" in title_lower:
+            recommendations.extend([
+                "Rest and stay hydrated",
+                "Use a humidifier to ease breathing"
+            ])
+        elif "anxiety" in title_lower or "panic" in title_lower:
+            recommendations.extend([
+                "Practice deep breathing exercises",
+                "Avoid caffeine and stimulants"
+            ])
+        
+        return recommendations

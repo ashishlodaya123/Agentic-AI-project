@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FaBrain, FaExclamationTriangle, FaChartBar } from "react-icons/fa";
+import { FaBrain, FaExclamationTriangle, FaChartBar, FaRedo } from "react-icons/fa";
 import { getDifferentialDiagnosis } from "../api";
 
 const DifferentialDiagnosis = ({
@@ -11,6 +11,12 @@ const DifferentialDiagnosis = ({
   const [diagnosisData, setDiagnosisData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [refreshCount, setRefreshCount] = useState(0);
+  
+  // Log props for debugging
+  useEffect(() => {
+    console.log("DifferentialDiagnosis props:", { taskId, patientData, symptomsAnalysis, riskAssessment });
+  }, [taskId, patientData, symptomsAnalysis, riskAssessment]);
 
   useEffect(() => {
     const fetchDifferentialDiagnosis = async () => {
@@ -25,10 +31,14 @@ const DifferentialDiagnosis = ({
           symptoms_analysis: symptomsAnalysis || {},
           risk_assessment: riskAssessment || {},
         };
+        
+        console.log("Sending differential diagnosis request:", requestData);
 
         const response = await getDifferentialDiagnosis(requestData);
+        console.log("Received differential diagnosis response:", response.data);
         if (response.data?.success) {
           setDiagnosisData(response.data.data);
+          console.log("Set diagnosis data:", response.data.data);
         } else {
           setError("Failed to fetch differential diagnosis data");
         }
@@ -41,7 +51,16 @@ const DifferentialDiagnosis = ({
     };
 
     fetchDifferentialDiagnosis();
-  }, [patientData, symptomsAnalysis, riskAssessment]);
+  }, [patientData, symptomsAnalysis, riskAssessment, refreshCount]);
+  
+  // Log when diagnosisData changes
+  useEffect(() => {
+    console.log("Diagnosis data updated:", diagnosisData);
+  }, [diagnosisData]);
+  
+  const handleRefresh = () => {
+    setRefreshCount(prev => prev + 1);
+  };
 
   if (loading) {
     return (
@@ -59,6 +78,13 @@ const DifferentialDiagnosis = ({
       <div className="text-center py-8">
         <FaExclamationTriangle className="mx-auto h-12 w-12 text-amber-500 mb-3" />
         <p className="body-large text-neutral-text-secondary">{error}</p>
+        <button 
+          onClick={handleRefresh}
+          className="btn btn-secondary mt-4 flex items-center mx-auto"
+        >
+          <FaRedo className="mr-2" />
+          Retry
+        </button>
       </div>
     );
   }
@@ -68,6 +94,7 @@ const DifferentialDiagnosis = ({
     !diagnosisData.differential_diagnosis ||
     diagnosisData.differential_diagnosis.length === 0
   ) {
+    console.log("No diagnosis data to display:", diagnosisData);
     return (
       <div className="text-center py-8">
         <FaBrain className="mx-auto h-12 w-12 text-gray-300 mb-3" />
@@ -75,17 +102,39 @@ const DifferentialDiagnosis = ({
           No differential diagnosis data available. This feature requires
           patient symptoms and clinical analysis.
         </p>
+        <button 
+          onClick={handleRefresh}
+          className="btn btn-secondary mt-4 flex items-center mx-auto"
+        >
+          <FaRedo className="mr-2" />
+          Retry
+        </button>
       </div>
     );
   }
+  
+  console.log("Displaying diagnosis data:", diagnosisData);
 
   // Sort by match score
   const sortedDiagnoses = [...diagnosisData.differential_diagnosis].sort(
     (a, b) => b.match_score - a.match_score
   );
+  
+  console.log("Sorted diagnoses:", sortedDiagnoses);
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="h2 text-neutral-text">Differential Diagnosis</h2>
+        <button 
+          onClick={handleRefresh}
+          className="btn btn-secondary btn-sm flex items-center"
+        >
+          <FaRedo className="mr-1" />
+          Refresh
+        </button>
+      </div>
+      
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="card">
           <div className="card-body text-center">
@@ -143,6 +192,11 @@ const DifferentialDiagnosis = ({
                     <span className="badge badge-secondary ml-2">
                       Prevalence: {(diagnosis.prevalence * 100).toFixed(0)}%
                     </span>
+                    {diagnosis.code && (
+                      <span className="badge badge-info ml-2">
+                        Code: {diagnosis.code}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="text-right">
@@ -203,6 +257,17 @@ const DifferentialDiagnosis = ({
                   ))}
                 </ul>
               </div>
+              
+              {diagnosis.description && (
+                <div className="mt-4 pt-4 border-t border-neutral-border">
+                  <h4 className="font-medium text-neutral-text mb-2">
+                    Description
+                  </h4>
+                  <p className="body-small text-neutral-text-secondary">
+                    {diagnosis.description}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         ))}

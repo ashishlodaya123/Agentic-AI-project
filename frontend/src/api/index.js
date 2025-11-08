@@ -27,7 +27,7 @@ apiClient.interceptors.request.use(
 // Add response interceptor for debugging
 apiClient.interceptors.response.use(
   (response) => {
-    console.log("API Response:", response.status, response.config.url);
+    console.log("API Response:", response.status, response.config.url, response.data);
     return response;
   },
   (error) => {
@@ -116,7 +116,16 @@ export const getClinicalVisualization = (requestData) => {
 };
 
 export const getDifferentialDiagnosis = (requestData) => {
-  return apiClient.post("/api/agents/differential-diagnosis", requestData);
+  console.log("Calling differential diagnosis API with data:", requestData);
+  return apiClient.post("/api/agents/differential-diagnosis", requestData)
+    .then(response => {
+      console.log("Differential diagnosis API response:", response.data);
+      return response;
+    })
+    .catch(error => {
+      console.error("Differential diagnosis API error:", error);
+      throw error;
+    });
 };
 
 // IoT Data Endpoint

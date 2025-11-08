@@ -199,9 +199,31 @@ def run_rag_agent(state: TriageState):
     symptoms_analysis = state['symptoms_analysis']
     # Handle both dict and string cases for backward compatibility
     if isinstance(symptoms_analysis, dict):
-        query = symptoms_analysis.get('summary', '')
+        # Prefer symptoms from the enhanced analysis
+        query_parts = []
+        
+        # Add primary symptoms from concerns
+        primary_concerns = symptoms_analysis.get('primary_concerns', [])
+        symptom_concerns = [c for c in primary_concerns if c.get('type') == 'symptom']
+        if symptom_concerns:
+            query_parts.append(' '.join([c.get('name', '') for c in symptom_concerns]))
+        
+        # Add categorized symptoms
+        symptom_categories = symptoms_analysis.get('symptom_categories', {})
+        for category, symptoms in symptom_categories.items():
+            if symptoms:
+                query_parts.append(' '.join(symptoms))
+        
+        # Add summary if available
+        summary = symptoms_analysis.get('summary', '')
+        if summary:
+            query_parts.append(summary)
+        
+        # Combine all parts for a comprehensive query
+        query = ' '.join(query_parts) if query_parts else summary
     else:
         query = str(symptoms_analysis)
+    
     result = agent.run(query)
     return {"rag_results": result}
 

@@ -516,7 +516,12 @@ Generates ranked differential diagnoses based on symptoms and vitals with enhanc
 - Confidence scoring for each differential based on match quality
 - Better utilization of structured symptoms analysis data
 - Enhanced vital sign indicator monitoring with more comprehensive checks
-- Limited to top 4 most relevant diagnoses for focused clinical decision-making
+- Dynamic diagnosis generation using NLM Conditions API for more accurate results (free to use, no API key required)
+- Serper API integration as fallback for additional diagnosis sources
+- Expanded to top 8 most relevant diagnoses when using more accurate external APIs
+- Medical condition coding support for better clinical documentation
+- Support for complex symptom patterns and comorbidities
+- High match scores (9.0+) indicate authoritative NLM-sourced diagnoses
 
 ### Predictive Analytics Agent
 
@@ -591,6 +596,14 @@ The system integrates with external medical data sources to enhance recommendati
 - **Benefits**: International health standards and guidelines
 - **Usage**: Automatically integrated without configuration
 - **Scope**: Global health recommendations and disease management
+
+### NLM Conditions API
+
+- **Access**: Completely free, no API key required
+- **Benefits**: Authoritative medical condition database from National Library of Medicine
+- **Usage**: Automatically integrated without configuration
+- **Scope**: Differential diagnosis generation with medical condition coding support
+- **Endpoint**: https://clinicaltables.nlm.nih.gov/api/conditions/v3/search
 
 ### Free Medical Imaging APIs
 

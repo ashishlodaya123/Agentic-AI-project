@@ -5,7 +5,7 @@ from typing import Any, List, Dict, Optional
 import re
 import json
 import os
-from app.utils.medical_apis import search_medline, get_cdc_data, get_who_data
+from app.utils.medical_apis import search_medline, get_cdc_data, get_who_data, search_serper
 from app.core.agent_memory import get_agent_memory
 
 class KnowledgeRAGAgent:
@@ -13,6 +13,7 @@ class KnowledgeRAGAgent:
     Agent for retrieving information from a clinical knowledge base using RAG.
     Enhanced with more sophisticated retrieval and ranking mechanisms.
     Integrates external medical data sources for comprehensive clinical guidance.
+    Prioritizes symptom-based queries for external data retrieval.
     """
     def __init__(self):
         self.client = chromadb.PersistentClient(path=settings.CHROMA_DB_PATH)
@@ -80,8 +81,9 @@ class KnowledgeRAGAgent:
         """
         Queries the knowledge base and returns the most relevant documents.
         Enhanced with external data integration and sophisticated ranking.
+        Prioritizes symptom-based information retrieval.
         """
-        # First, try to get external data
+        # First, try to get external data with enhanced symptom-focused queries
         external_data = self._get_external_data(query)
         
         # Then query the local knowledge base
@@ -104,25 +106,90 @@ class KnowledgeRAGAgent:
     def _get_external_data(self, query: str) -> dict:
         """
         Retrieve data from external medical sources with fallback.
+        Enhanced to prioritize symptom-based queries.
         """
         if not settings.ENABLE_EXTERNAL_APIS:
             return {
                 "medline": {"status": "skipped", "message": "External API calls disabled"},
                 "cdc": {"status": "skipped", "message": "External API calls disabled"},
-                "who": {"status": "skipped", "message": "External API calls disabled"}
+                "who": {"status": "skipped", "message": "External API calls disabled"},
+                "serper": {"status": "skipped", "message": "External API calls disabled"}
             }
         
-        # Get data from external APIs
-        medline_data = search_medline(query)
-        cdc_data = get_cdc_data(query)
-        who_data = get_who_data(query)
+        # Extract key symptoms from query for more targeted searches
+        key_symptoms = self._extract_key_symptoms(query)
         
+        # Use both original query and symptom-focused queries
+        search_queries = [query]
+        if key_symptoms:
+            symptom_query = " ".join(key_symptoms)
+            if symptom_query != query:
+                search_queries.append(symptom_query)
+        
+        # Get data from external APIs using multiple queries
+        medline_results = []
+        cdc_results = []
+        who_results = []
+        serper_results = []
+        
+        for search_query in search_queries:
+            # Get data from external APIs
+            medline_data = search_medline(search_query)
+            cdc_data = get_cdc_data(search_query)
+            who_data = get_who_data(search_query)
+            serper_data = search_serper(search_query)
+            
+            # Collect successful results
+            if medline_data.get("status") == "success":
+                medline_results.append(medline_data)
+            if cdc_data.get("status") == "success":
+                cdc_results.append(cdc_data)
+            if who_data.get("status") == "success":
+                who_results.append(who_data)
+            if serper_data.get("status") == "success":
+                serper_results.append(serper_data)
+        
+        # Use the best results (prefer results from symptom-focused queries)
         external_data = {
-            "medline": medline_data,
-            "cdc": cdc_data,
-            "who": who_data
+            "medline": medline_results[-1] if medline_results else {"status": "failed", "message": "No MEDLINE data found"},
+            "cdc": cdc_results[-1] if cdc_results else {"status": "failed", "message": "No CDC data found"},
+            "who": who_results[-1] if who_results else {"status": "failed", "message": "No WHO data found"},
+            "serper": serper_results[-1] if serper_results else {"status": "failed", "message": "No Serper data found"}
         }
+        
         return external_data
+
+    def _extract_key_symptoms(self, query: str) -> List[str]:
+        """
+        Extract key symptoms from a query to create more targeted searches.
+        """
+        # Common medical terms that indicate symptoms
+        symptom_indicators = [
+            "pain", "fever", "cough", "shortness of breath", "nausea", "vomiting",
+            "headache", "dizziness", "fatigue", "weakness", "swelling", "rash",
+            "itching", "burning", "numbness", "tingling", "cramping", "spasms",
+            "difficulty", "problems", "issues", "trouble", "excessive", "frequent"
+        ]
+        
+        # Extract potential symptoms
+        symptoms = []
+        query_lower = query.lower()
+        
+        # Look for symptom indicators in the query
+        for indicator in symptom_indicators:
+            if indicator in query_lower:
+                # Find the context around the indicator
+                words = query_lower.split()
+                for i, word in enumerate(words):
+                    if indicator in word:
+                        # Get a few words around the indicator
+                        start = max(0, i - 2)
+                        end = min(len(words), i + 3)
+                        context = " ".join(words[start:end])
+                        if context not in symptoms:
+                            symptoms.append(context)
+        
+        return symptoms
 
     def _enhance_results(self, results: Any, query: str, external_data: Optional[dict] = None) -> List[Dict]:
         """
@@ -172,6 +239,24 @@ class KnowledgeRAGAgent:
                     "type": "international_guidelines",
                     "evidence_level": "High - International health authority"
                 })
+            
+            # Add Serper data if successful
+            serper_data = external_data.get("serper", {})
+            if isinstance(serper_data, dict) and serper_data.get("status") == "success" and "results" in serper_data:
+                results_list = serper_data.get("results", [])
+                if isinstance(results_list, list):
+                    for i, result in enumerate(results_list[:3]):  # Limit to top 3 results
+                        if isinstance(result, dict):
+                            enhanced_docs.append({
+                                "content": f"Medical information about {query}: {result.get('snippet', '')}",
+                                "relevance_score": 0.80,
+                                "source": "Serper/Google Search",
+                                "title": result.get('title', 'Medical Information'),
+                                "external": True,
+                                "type": "web_search",
+                                "evidence_level": "Moderate - Web search results",
+                                "link": result.get('link', '')
+                            })
         
         # Process local database results
         if results and 'documents' in results and results['documents']:
@@ -185,7 +270,7 @@ class KnowledgeRAGAgent:
                 if len(doc.strip()) < 10:
                     continue
                     
-                # Calculate relevance score
+                # Calculate relevance score with enhanced symptom matching
                 relevance_score = self._calculate_relevance(query, doc)
                 
                 # Skip documents with very low relevance
@@ -213,7 +298,7 @@ class KnowledgeRAGAgent:
         enhanced_docs.sort(key=lambda x: x["relevance_score"], reverse=True)
         
         # Return top documents with enhanced categorization
-        return self._categorize_and_prioritize_results(enhanced_docs[:8])
+        return self._categorize_and_prioritize_results(enhanced_docs[:10])
 
     def _categorize_and_prioritize_results(self, results: List[Dict]) -> List[Dict]:
         """
@@ -231,6 +316,11 @@ class KnowledgeRAGAgent:
             if result.get("source") in ["MEDLINE/PubMed", "CDC", "WHO"]:
                 prioritized_results.append(result)
         
+        # Add Serper results
+        for result in external_results:
+            if result.get("source") == "Serper/Google Search":
+                prioritized_results.append(result)
+        
         # Add local clinical guidelines
         for result in local_results:
             prioritized_results.append(result)
@@ -240,12 +330,12 @@ class KnowledgeRAGAgent:
             if result not in prioritized_results:
                 prioritized_results.append(result)
         
-        return prioritized_results[:8]  # Return top 8 most relevant results to include external sources
+        return prioritized_results[:10]  # Return top 10 most relevant results to include external sources
 
     def _calculate_relevance(self, query: str, document: str) -> float:
         """
         Calculate a relevance score between query and document.
-        Enhanced with medical terminology matching.
+        Enhanced with medical terminology matching and symptom prioritization.
         """
         query_words = set(query.lower().split())
         doc_words = set(document.lower().split())
@@ -264,11 +354,19 @@ class KnowledgeRAGAgent:
         
         # Boost score for medical terminology matches
         medical_terms = ["treatment", "diagnosis", "management", "protocol", "guideline", 
-                        "clinical", "medical", "patient", "symptom", "condition"]
+                        "clinical", "medical", "patient", "symptom", "condition", 
+                        "therapy", "intervention", "assessment", "evaluation"]
         medical_matches = len(query_words.intersection(set(medical_terms)))
-        medical_boost = medical_matches * 0.1
+        medical_boost = medical_matches * 0.15  # Increased boost for medical terms
         
-        return min(1.0, base_similarity + medical_boost)
+        # Additional boost for symptom-related terms
+        symptom_terms = ["pain", "fever", "cough", "breath", "nausea", "vomit",
+                        "headache", "dizzy", "fatigue", "weak", "swell", "rash",
+                        "itch", "burn", "numb", "tingle", "cramp", "spasm"]
+        symptom_matches = len(query_words.intersection(set(symptom_terms)))
+        symptom_boost = symptom_matches * 0.2  # Higher boost for symptom terms
+        
+        return min(1.0, base_similarity + medical_boost + symptom_boost)
 
     def _format_document_content(self, content: str) -> str:
         """
