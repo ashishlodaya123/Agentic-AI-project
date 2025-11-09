@@ -13,7 +13,7 @@ class SpecialistConsultationAgent:
         # Specialist recommendation database
         self.specialist_recommendations = {
             "cardiology": {
-                "conditions": ["chest_pain", "heart_failure", "arrhythmia", "hypertension"],
+                "conditions": ["chest_pain", "heart_failure", "arrhythmia", "hypertension", "myocardial_infarction"],
                 "urgency_levels": {
                     "immediate": "Within 15 minutes - Cardiac emergency",
                     "urgent": "Within 2 hours - High-risk cardiac condition",
@@ -25,7 +25,7 @@ class SpecialistConsultationAgent:
                 }
             },
             "pulmonology": {
-                "conditions": ["shortness_of_breath", "asthma", "copd", "pneumonia"],
+                "conditions": ["shortness_of_breath", "asthma", "copd", "pneumonia", "pulmonary_embolism"],
                 "urgency_levels": {
                     "immediate": "Within 30 minutes - Respiratory emergency",
                     "urgent": "Within 4 hours - Significant respiratory compromise",
@@ -37,7 +37,7 @@ class SpecialistConsultationAgent:
                 }
             },
             "infectious_disease": {
-                "conditions": ["fever", "sepsis", "pneumonia", "uti"],
+                "conditions": ["fever", "sepsis", "pneumonia", "uti", "meningitis"],
                 "urgency_levels": {
                     "immediate": "Within 1 hour - Suspected sepsis",
                     "urgent": "Within 4 hours - Persistent fever with complications",
@@ -49,7 +49,7 @@ class SpecialistConsultationAgent:
                 }
             },
             "neurology": {
-                "conditions": ["headache", "seizure", "stroke", "altered_mental_status"],
+                "conditions": ["headache", "seizure", "stroke", "altered_mental_status", "migraine"],
                 "urgency_levels": {
                     "immediate": "Within 15 minutes - Neurological emergency",
                     "urgent": "Within 2 hours - Significant neurological deficit",
@@ -61,7 +61,7 @@ class SpecialistConsultationAgent:
                 }
             },
             "emergency_medicine": {
-                "conditions": ["trauma", "overdose", "acute_abdomen", "anaphylaxis"],
+                "conditions": ["trauma", "overdose", "acute_abdomen", "anaphylaxis", "cardiac_arrest"],
                 "urgency_levels": {
                     "immediate": "Immediately - Life-threatening emergency",
                     "urgent": "Within 1 hour - Serious acute condition",
@@ -70,6 +70,30 @@ class SpecialistConsultationAgent:
                 "consultation_details": {
                     "emergency": "Activate trauma team if applicable",
                     "routine": "Provide complete history and physical"
+                }
+            },
+            "endocrinology": {
+                "conditions": ["diabetes", "thyroid_disorder", "adrenal_insufficiency"],
+                "urgency_levels": {
+                    "immediate": "Within 1 hour - Endocrine emergency",
+                    "urgent": "Within 4 hours - Significant endocrine dysfunction",
+                    "routine": "Within 1 week - Chronic endocrine condition"
+                },
+                "consultation_details": {
+                    "emergency": "Provide recent glucose and electrolyte levels",
+                    "routine": "Bring endocrine function test results"
+                }
+            },
+            "gastroenterology": {
+                "conditions": ["gi_bleeding", "liver_disease", "pancreatitis", "inflammatory_bowel_disease"],
+                "urgency_levels": {
+                    "immediate": "Within 1 hour - GI emergency",
+                    "urgent": "Within 4 hours - Significant GI condition",
+                    "routine": "Within 1 week - Chronic GI condition"
+                },
+                "consultation_details": {
+                    "emergency": "Prepare for possible endoscopy",
+                    "routine": "Bring recent liver function tests and imaging"
                 }
             }
         }
@@ -161,10 +185,10 @@ class SpecialistConsultationAgent:
         elif len(primary_recs) > 3:
             complexity_score += 1
             
-        # Determine complexity level
-        if complexity_score >= 6:
+        # Determine complexity level with more granular thresholds
+        if complexity_score >= 7:
             return "high_complexity"
-        elif complexity_score >= 3:
+        elif complexity_score >= 4:
             return "moderate_complexity"
         else:
             return "low_complexity"
@@ -175,7 +199,7 @@ class SpecialistConsultationAgent:
         symptoms_lower = symptoms.lower()
         
         # Symptom-based condition identification
-        if "chest pain" in symptoms_lower:
+        if "chest pain" in symptoms_lower or "chest discomfort" in symptoms_lower:
             conditions.append("chest_pain")
         if "shortness of breath" in symptoms_lower or "difficulty breathing" in symptoms_lower:
             conditions.append("shortness_of_breath")
@@ -183,16 +207,28 @@ class SpecialistConsultationAgent:
             conditions.append("fever")
         if "headache" in symptoms_lower and "severe" in symptoms_lower:
             conditions.append("headache")
-        if "seizure" in symptoms_lower:
+        if "seizure" in symptoms_lower or "convulsion" in symptoms_lower:
             conditions.append("seizure")
+        if "diabetes" in symptoms_lower or "hyperglycemia" in symptoms_lower or "hypoglycemia" in symptoms_lower:
+            conditions.append("diabetes")
+        if "thyroid" in symptoms_lower:
+            conditions.append("thyroid_disorder")
+        if "bleeding" in symptoms_lower:
+            conditions.append("gi_bleeding")
+        if "jaundice" in symptoms_lower or "yellow skin" in symptoms_lower:
+            conditions.append("liver_disease")
+        if "abdominal pain" in symptoms_lower:
+            conditions.append("acute_abdomen")
             
         # Vital-based condition identification
         if self._has_hypertension(vitals):
             conditions.append("hypertension")
         if self._has_hypotension(vitals):
             conditions.append("hypotension")
+        if self._has_tachycardia(vitals):
+            conditions.append("arrhythmia")
             
-        return conditions
+        return list(set(conditions))  # Remove duplicates
 
     def _identify_critical_vitals(self, vitals: dict) -> List[str]:
         """Identify critical vital signs."""
@@ -273,6 +309,17 @@ class SpecialistConsultationAgent:
                 if len(bp_parts) == 2:
                     systolic = int(bp_parts[0])
                     return systolic < 90
+            except (ValueError, TypeError):
+                return False
+        return False
+
+    def _has_tachycardia(self, vitals: dict) -> bool:
+        """Check if patient has tachycardia based on vital signs."""
+        heart_rate = vitals.get("heart_rate")
+        if heart_rate is not None:
+            try:
+                hr = int(heart_rate)
+                return hr > 100
             except (ValueError, TypeError):
                 return False
         return False
@@ -371,6 +418,6 @@ class SpecialistConsultationAgent:
             return 0.4  # Lower confidence when no specific conditions identified
             
         # Higher confidence when specific conditions are identified
-        base_confidence = 0.7
-        confidence_boost = min(len(conditions) * 0.1, 0.25)  # Max 0.25 boost for multiple conditions
-        return min(base_confidence + confidence_boost, 0.9)  # Cap at 0.9
+        base_confidence = 0.75
+        confidence_boost = min(len(conditions) * 0.08, 0.2)  # Max 0.2 boost for multiple conditions
+        return min(base_confidence + confidence_boost, 0.95)  # Cap at 0.95

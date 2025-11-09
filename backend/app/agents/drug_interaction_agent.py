@@ -27,6 +27,11 @@ class DrugInteractionAgent:
                     "severity": "moderate",
                     "description": "Reduced antiplatelet effect of aspirin, increased GI bleeding risk",
                     "management": "Avoid concurrent use, consider alternative NSAIDs"
+                },
+                "heparin": {
+                    "severity": "high",
+                    "description": "Additive anticoagulant effect increases bleeding risk",
+                    "management": "Avoid concurrent use, monitor coagulation parameters"
                 }
             },
             "nitroglycerin": {
@@ -36,6 +41,11 @@ class DrugInteractionAgent:
                     "management": "Contraindicated, avoid concurrent use"
                 },
                 "tadalafil": {
+                    "severity": "high",
+                    "description": "Severe hypotension due to synergistic vasodilation",
+                    "management": "Contraindicated, avoid concurrent use"
+                },
+                "vardenafil": {
                     "severity": "high",
                     "description": "Severe hypotension due to synergistic vasodilation",
                     "management": "Contraindicated, avoid concurrent use"
@@ -51,6 +61,11 @@ class DrugInteractionAgent:
                     "severity": "high",
                     "description": "Increased risk of hyperkalemia",
                     "management": "Monitor serum potassium frequently, consider alternative therapy"
+                },
+                "nsaids": {
+                    "severity": "moderate",
+                    "description": "Reduced antihypertensive effect, risk of renal impairment",
+                    "management": "Monitor blood pressure and renal function, avoid concurrent use if possible"
                 }
             },
             "warfarin": {
@@ -63,6 +78,18 @@ class DrugInteractionAgent:
                     "severity": "high",
                     "description": "Increased INR due to CYP2C9 inhibition",
                     "management": "Monitor INR frequently, reduce warfarin dose"
+                },
+                "metronidazole": {
+                    "severity": "moderate",
+                    "description": "Increased INR due to CYP2C9 inhibition",
+                    "management": "Monitor INR, consider temporary discontinuation"
+                }
+            },
+            "digoxin": {
+                "amiodarone": {
+                    "severity": "moderate",
+                    "description": "Increased digoxin levels, risk of toxicity",
+                    "management": "Monitor digoxin levels, reduce dose by 50%"
                 }
             }
         }
@@ -70,20 +97,24 @@ class DrugInteractionAgent:
         # Contraindication database
         self.contraindications = {
             "aspirin": {
-                "conditions": ["active_bleeding", "severe_liver_disease", "allergy_to_nsaids"],
-                "description": "Contraindicated in patients with active bleeding or severe liver disease"
+                "conditions": ["active_bleeding", "severe_liver_disease", "allergy_to_nsaids", "peptic_ulcer_disease"],
+                "description": "Contraindicated in patients with active bleeding, severe liver disease, or peptic ulcer disease"
             },
             "nitroglycerin": {
                 "conditions": ["severe_anemia", "increased_intracranial_pressure", "phosphodiesterase_inhibitors"],
                 "description": "Contraindicated in patients with severe anemia or recent phosphodiesterase inhibitor use"
             },
             "ace_inhibitors": {
-                "conditions": ["pregnancy", "angioedema_history", "bilateral_renal_artery_stenosis"],
-                "description": "Contraindicated in pregnancy and patients with history of angioedema"
+                "conditions": ["pregnancy", "angioedema_history", "bilateral_renal_artery_stenosis", "hereditary_angioedema"],
+                "description": "Contraindicated in pregnancy and patients with history of angioedema or bilateral renal artery stenosis"
             },
             "warfarin": {
-                "conditions": ["active_bleeding", "severe_liver_disease", "pregnancy"],
-                "description": "Contraindicated in patients with active bleeding or severe liver disease"
+                "conditions": ["active_bleeding", "severe_liver_disease", "pregnancy", "recent_surgery"],
+                "description": "Contraindicated in patients with active bleeding, severe liver disease, or recent surgery"
+            },
+            "digoxin": {
+                "conditions": ["ventricular_fibrillation", "hypertrophic_obstructive_cardiomyopathy"],
+                "description": "Contraindicated in ventricular fibrillation and hypertrophic obstructive cardiomyopathy"
             }
         }
         
@@ -160,16 +191,19 @@ class DrugInteractionAgent:
         medications = []
         medication_keywords = [
             "aspirin", "nitroglycerin", "warfarin", "clopidogrel", "ibuprofen",
-            "sildenafil", "tadalafil", "ace inhibitors", "arb", "potassium",
-            "spironolactone", "amiodarone", "fluconazole", "oxygen"
+            "sildenafil", "tadalafil", "vardenafil", "ace inhibitors", "arb", 
+            "potassium", "spironolactone", "amiodarone", "fluconazole", "oxygen",
+            "digoxin", "heparin", "metronidazole", "nsaids", "furosemide"
         ]
         
         for recommendation in recommendations:
+            # Convert to lowercase for case-insensitive matching
+            rec_lower = recommendation.lower()
             for keyword in medication_keywords:
-                if keyword.lower() in recommendation.lower():
+                if keyword.lower() in rec_lower:
                     medications.append(keyword.lower())
                     
-        return medications
+        return list(set(medications))  # Remove duplicates and return unique medications
 
     def _check_drug_interactions(self, proposed_medications: List[str], 
                                 current_medications: List[str]) -> List[Dict[str, Any]]:
@@ -360,9 +394,11 @@ class DrugInteractionAgent:
         if not recommendations:
             recommendations.append("No significant drug interactions or contraindications identified.")
             recommendations.append("Continue with prescribed treatment plan.")
+            recommendations.append("Monitor patient for expected therapeutic response and adverse effects.")
         else:
-            recommendations.append("Consult with clinical pharmacist for detailed review.")
-            recommendations.append("Monitor patient closely for adverse effects.")
+            recommendations.append("Consult with clinical pharmacist for detailed review of identified interactions.")
+            recommendations.append("Monitor patient closely for adverse effects and therapeutic response.")
+            recommendations.append("Document all findings in patient medical record and communicate with prescribing physician.")
         
         return recommendations
 
@@ -370,14 +406,23 @@ class DrugInteractionAgent:
                                    contraindications: List[Dict[str, Any]]) -> float:
         """Calculate confidence score for safety screening."""
         # Base confidence
-        base_confidence = 0.8
+        base_confidence = 0.85
         
-        # Adjust based on number of findings
+        # Count high-severity findings
+        high_severity_findings = len([i for i in interactions if i["severity"] == "high"]) + \
+                               len([c for c in contraindications if c.get("contraindication") in 
+                                   ["active_bleeding", "severe_liver_disease", "pregnancy", 
+                                    "severe_anemia", "phosphodiesterase_inhibitors"]])
+        
+        # Adjust based on number and severity of findings
         total_findings = len(interactions) + len(contraindications)
-        if total_findings > 5:
+        if high_severity_findings > 0:
+            # Higher confidence when high-severity findings are present
+            confidence = min(0.95, base_confidence + (high_severity_findings * 0.05))
+        elif total_findings > 5:
             # Lower confidence if many potential interactions (may be false positives)
-            confidence = max(0.5, base_confidence - (total_findings * 0.02))
+            confidence = max(0.6, base_confidence - (total_findings * 0.03))
         else:
             confidence = base_confidence
             
-        return round(confidence, 2)
+        return round(confidence, 3)

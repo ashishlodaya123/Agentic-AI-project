@@ -236,7 +236,9 @@ class PredictiveAnalyticsAgent:
                     "monitoring_recommendations": comp_data["severity_levels"].get(risk_level, "Standard monitoring")
                 })
         
-        return predictions
+        # Sort by risk score and limit to top 4 complications for better performance
+        predictions = sorted(predictions, key=lambda x: x["risk_score"], reverse=True)
+        return predictions[:4]  # Return only top 4 instead of all
     
     def _check_risk_factor(self, factor: str, symptoms: str, age: int, gender: str, 
                           medical_history: List[str], symptoms_analysis: dict) -> bool:

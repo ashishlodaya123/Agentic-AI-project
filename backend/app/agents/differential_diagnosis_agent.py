@@ -1,9 +1,8 @@
 import logging
 from typing import Dict, List, Any
 from datetime import datetime
-
-# Add imports for dynamic diagnosis generation
-from ..utils.medical_apis import search_serper, search_nlm_conditions
+import asyncio
+from ..utils.medical_apis import async_search_serper
 
 logger = logging.getLogger(__name__)
 
@@ -151,20 +150,11 @@ class DifferentialDiagnosisAgent:
             else:
                 combined_symptoms = symptoms
             
-            # First try to generate dynamic diagnoses using NLM Conditions API (more accurate)
-            # Use just the main symptoms for NLM API, as it works better with simple terms
-            dynamic_diagnoses = self._generate_dynamic_diagnoses_nlm(symptoms, vitals, age, gender, medical_history, symptoms_analysis)
-            
-            # Log the results for debugging
-            logger.info(f"NLM API returned {len(dynamic_diagnoses) if dynamic_diagnoses else 0} diagnoses")
-            
-            # If we don't have good results from NLM, try Serper API as fallback
-            if not dynamic_diagnoses or not any(d.get("match_score", 0) > 5.0 for d in dynamic_diagnoses):
-                logger.info("Falling back to Serper API")
-                dynamic_diagnoses = self._generate_dynamic_diagnoses_serper(combined_symptoms, vitals, age, gender, medical_history, symptoms_analysis)
+            # Generate dynamic diagnoses using Serper API as primary source
+            dynamic_diagnoses = self._generate_dynamic_diagnoses_serper(combined_symptoms, vitals, age, gender, medical_history, symptoms_analysis)
             
             # If we have dynamic diagnoses with good matches, use them; otherwise fall back to hardcoded conditions
-            if dynamic_diagnoses and any(d.get("match_score", 0) > 5.0 for d in dynamic_diagnoses):
+            if dynamic_diagnoses and any(d.get("match_score", 0) > 4.0 for d in dynamic_diagnoses):
                 diagnosis_list = dynamic_diagnoses
                 logger.info(f"Using dynamic diagnoses with {len(diagnosis_list)} results")
             else:
@@ -176,7 +166,7 @@ class DifferentialDiagnosisAgent:
             ranked_diagnoses = sorted(diagnosis_list, key=lambda x: x["match_score"], reverse=True)
             
             # Limit to top diagnoses
-            # Always use top 4 for consistency, whether from NLM, Serper, or hardcoded
+            # Always use top 4 for consistency, whether from Serper or hardcoded
             top_diagnoses = ranked_diagnoses[:4]
             
             # Add confidence scores based on match scores
@@ -208,7 +198,61 @@ class DifferentialDiagnosisAgent:
                 "error": str(e),
                 "timestamp": datetime.now().isoformat()
             }
-    
+
+    def _generate_dynamic_diagnoses_serper(self, symptoms: str, vitals: dict, age: int, gender: str, medical_history: List[str], symptoms_analysis: dict) -> List[Dict[str, Any]]:
+        """Generate and rank possible diagnoses using Serper API."""
+        diagnoses = []
+        
+        try:
+            # Search using Serper API
+            serper_result = asyncio.run(async_search_serper(symptoms))
+            
+            # Check if we got a valid response
+            if not isinstance(serper_result, dict) or serper_result.get("status") != "success":
+                logger.info("Serper API not available, falling back to hardcoded conditions")
+                return []
+            
+            search_results = serper_result.get("results", [])
+            
+            # Process each search result to create a diagnosis
+            for result in search_results:
+                # Handle dict results from Serper API
+                if isinstance(result, dict):
+                    title = result.get("title", "")
+                    snippet = result.get("snippet", "")
+                    link = result.get("link", "")
+                else:
+                    # If it's not a dict, skip this result
+                    continue
+                
+                # Calculate match score based on relevance
+                match_score = self._calculate_dynamic_match_score(symptoms, title, snippet)
+                
+                # Include results with moderate match to increase diagnosis count
+                if match_score > 3.0:  # Lowered threshold to get more diagnoses
+                    diagnoses.append({
+                        "condition": self._extract_condition_name(title),
+                        "match_score": round(match_score, 3),
+                        "matched_symptoms": [],  # Will be populated by frontend
+                        "matched_vitals": [],    # Will be populated by frontend
+                        "severity": self._assess_severity(title, snippet),
+                        "prevalence": min(0.9, match_score / 20.0),  # Normalize prevalence
+                        "recommendations": self._get_dynamic_recommendations(title, snippet),
+                        "description": snippet[:200] + "..." if len(snippet) > 200 else snippet
+                    })
+            
+            # Sort by match score
+            diagnoses = sorted(diagnoses, key=lambda x: x["match_score"], reverse=True)
+            
+        except asyncio.TimeoutError:
+            logger.warning("Serper API timeout, falling back to hardcoded conditions")
+            return []
+        except Exception as e:
+            logger.error(f"Error in Serper diagnosis generation: {e}")
+            return []
+        
+        return diagnoses[:4]  # Return top 4 diagnoses to ensure we get at least 2-3 quality diagnoses
+
     def _generate_diagnoses(self, symptoms: str, vitals: dict, age: int, gender: str, medical_history: List[str], symptoms_analysis: dict) -> List[Dict[str, Any]]:
         """Generate and rank possible diagnoses based on symptoms, vitals, and patient data."""
         diagnoses = []
@@ -223,110 +267,20 @@ class DifferentialDiagnosisAgent:
             demographics = condition_data.get("demographics", {})
             age_min = demographics.get("age_min", 0)
             age_max = demographics.get("age_max", 100)
-            if not (age_min <= age <= age_max):
-                # Skip conditions not appropriate for patient's age
-                continue
             
-            # Check symptom matches - enhanced processing
-            condition_symptoms = condition_data["symptoms"]
+            if age_min <= age <= age_max:
+                match_score += 0.5  # Base demographic match
             
-            # Method 1: Direct symptom matching from chief complaint with enhanced weighting
-            symptom_words = set(symptoms.split())
-            for symptom in condition_symptoms:
-                # Exact match gets highest weight
-                if symptom in symptoms:
-                    match_score += 3.0
-                    matched_symptoms.append(symptom)
-                # Partial word match gets moderate weight
-                elif any(word in symptom or symptom in word for word in symptom_words):
-                    match_score += 1.5
-                    matched_symptoms.append(symptom)
+            # Check symptoms
+            condition_symptoms = condition_data.get("symptoms", [])
+            symptom_words = symptoms.split()
             
-            # Method 2: Check symptoms from analysis if available
-            if symptoms_analysis:
-                # Check categorized symptoms with weighted matching
-                categories = symptoms_analysis.get("symptom_categories", {})
-                for category, category_symptoms in categories.items():
-                    for symptom_dict in category_symptoms:
-                        # Handle both string and dict formats
-                        if isinstance(symptom_dict, str):
-                            symptom_name = symptom_dict.lower()
-                        else:
-                            symptom_name = symptom_dict.get("name", "").lower()
-                        
-                        # Check if this symptom matches any condition symptom
-                        for condition_symptom in condition_symptoms:
-                            # Exact match
-                            if condition_symptom == symptom_name:
-                                if condition_symptom not in matched_symptoms:
-                                    match_score += 2.5
-                                    matched_symptoms.append(condition_symptom)
-                            # Strong fuzzy match
-                            elif self._fuzzy_match(condition_symptom, symptom_name):
-                                if condition_symptom not in matched_symptoms:
-                                    match_score += 2.0
-                                    matched_symptoms.append(condition_symptom)
-                            # Partial match
-                            elif (condition_symptom in symptom_name or 
-                                  symptom_name in condition_symptom):
-                                if condition_symptom not in matched_symptoms:
-                                    match_score += 1.0
-                                    matched_symptoms.append(condition_symptom)
-                
-                # Check primary concerns with highest weight
-                primary_concerns = symptoms_analysis.get("primary_concerns", [])
-                for concern in primary_concerns:
-                    concern_name = concern.get("name", concern.get("condition", "")).lower()
-                    concern_significance = concern.get("significance", "").lower()
-                    
-                    # Check against condition symptoms
-                    for condition_symptom in condition_symptoms:
-                        # Exact match
-                        if (condition_symptom == concern_name or 
-                            condition_symptom == concern_significance):
-                            if condition_symptom not in matched_symptoms:
-                                match_score += 3.0
-                                matched_symptoms.append(condition_symptom)
-                        # Strong fuzzy match
-                        elif (self._fuzzy_match(condition_symptom, concern_name) or
-                              self._fuzzy_match(condition_symptom, concern_significance)):
-                            if condition_symptom not in matched_symptoms:
-                                match_score += 2.5
-                                matched_symptoms.append(condition_symptom)
-                        # Partial match
-                        elif (condition_symptom in concern_name or 
-                              condition_symptom in concern_significance or
-                              concern_name in condition_symptom or
-                              concern_significance in condition_symptom):
-                            if condition_symptom not in matched_symptoms:
-                                match_score += 1.5
-                                matched_symptoms.append(condition_symptom)
-                
-                # Check detailed analysis for more symptoms
-                detailed_analysis = symptoms_analysis.get("detailed_analysis", {})
-                symptom_analysis = detailed_analysis.get("symptom_analysis", {})
-                by_system = symptom_analysis.get("by_system", {})
-                
-                for system, system_symptoms in by_system.items():
-                    for symptom in system_symptoms:
-                        # Check if this symptom matches any condition symptom
-                        for condition_symptom in condition_symptoms:
-                            # Exact match
-                            if condition_symptom.lower() == symptom.lower():
-                                if condition_symptom not in matched_symptoms:
-                                    match_score += 2.0
-                                    matched_symptoms.append(condition_symptom)
-                            # Strong fuzzy match
-                            elif self._fuzzy_match(condition_symptom, symptom.lower()):
-                                if condition_symptom not in matched_symptoms:
-                                    match_score += 1.8
-                                    matched_symptoms.append(condition_symptom)
-                            # Partial match
-                            elif (condition_symptom in symptom.lower() or 
-                                  symptom.lower() in condition_symptom):
-                                if condition_symptom not in matched_symptoms:
-                                    match_score += 1.0
-                                    matched_symptoms.append(condition_symptom)
+            for symptom in symptom_words:
+                # Check for exact matches and partial matches
+                for condition_symptom in condition_symptoms:
+                    if self._symptoms_match(symptom, condition_symptom):
+                        match_score += 1.0
+                        matched_symptoms.append(condition_symptom)
             
             # Check vital sign indicators with increased weight
             vital_indicators = condition_data["vital_indicators"]
@@ -353,159 +307,26 @@ class DifferentialDiagnosisAgent:
                     "match_score": round(match_score, 3),
                     "matched_symptoms": matched_symptoms,
                     "matched_vitals": matched_vitals,
-                    "severity": condition_data["severity"],
-                    "prevalence": condition_data["prevalence"],
+                    "severity": condition_data.get("severity", "moderate"),
+                    "prevalence": prevalence,
                     "recommendations": self._get_recommendations(condition_key)
                 })
         
         return diagnoses
-    
-    def _check_vital_indicator(self, indicator: str, vitals: dict) -> bool:
-        """Check if a vital sign indicator is present with enhanced accuracy."""
-        if indicator == "fever":
-            temp = vitals.get("temperature")
-            if temp:
-                try:
-                    # Handle different temperature formats
-                    if isinstance(temp, str):
-                        temp = temp.replace("°C", "").replace("°F", "").strip()
-                        temp_value = float(temp)
-                        # Convert Fahrenheit to Celsius if needed
-                        if temp_value > 100:  # Likely Fahrenheit
-                            temp_value = (temp_value - 32) * 5/9
-                    else:
-                        temp_value = float(temp)
-                    return temp_value > 38.0
-                except (ValueError, TypeError):
-                    return False
-        elif indicator == "high_blood_pressure":
-            bp = vitals.get("blood_pressure")
-            if bp:
-                try:
-                    # Handle different BP formats
-                    if isinstance(bp, str):
-                        # Extract systolic value from formats like "120/80" or "120 mmHg"
-                        systolic_str = bp.split("/")[0].split()[0]
-                        systolic = int(systolic_str)
-                    else:
-                        systolic = int(bp)
-                    return systolic > 140
-                except (ValueError, IndexError, TypeError):
-                    return False
-        elif indicator == "rapid_heart_rate":
-            hr = vitals.get("heart_rate")
-            if hr:
-                try:
-                    # Handle different heart rate formats
-                    if isinstance(hr, str):
-                        hr = hr.replace("bpm", "").strip()
-                    return int(hr) > 100
-                except (ValueError, TypeError):
-                    return False
-        elif indicator == "rapid_breathing":
-            rr = vitals.get("respiratory_rate")
-            if rr:
-                try:
-                    # Handle different respiratory rate formats
-                    if isinstance(rr, str):
-                        rr = rr.replace("breaths/min", "").strip()
-                    return int(rr) > 20
-                except (ValueError, TypeError):
-                    return False
-        elif indicator == "low_oxygen":
-            oxygen = vitals.get("oxygen_saturation")
-            if oxygen:
-                try:
-                    # Handle different oxygen saturation formats
-                    if isinstance(oxygen, str):
-                        oxygen = oxygen.replace("%", "").replace("sat", "").strip()
-                    return float(oxygen) < 95
-                except (ValueError, TypeError):
-                    return False
-        
-        return False
-    
-    def _adjust_for_demographics(self, score: float, condition_key: str, age: int, gender: str) -> float:
-        """Adjust match score based on patient demographics."""
-        adjusted_score = score
-        
-        # Age-related adjustments with more nuanced logic
-        if age > 65:
-            # Higher risk for cardiovascular conditions
-            if condition_key in ["myocardial_infarction", "hypertensive_crisis", "pericarditis"]:
-                adjusted_score += 0.7
-            # Lower risk for certain conditions
-            elif condition_key in ["pneumothorax", "anxiety_panic_attack"]:
-                adjusted_score -= 0.3
-        elif age < 18:
-            # Lower risk for certain adult conditions
-            if condition_key in ["hypertensive_crisis", "myocardial_infarction"]:
-                adjusted_score -= 0.8
-            # Higher risk for pediatric conditions
-            elif condition_key in ["bronchitis", "asthma_exacerbation"]:
-                adjusted_score += 0.5
-        elif 30 <= age <= 50:
-            # Higher risk for certain conditions in this age group
-            if condition_key in ["anxiety_panic_attack", "gastroesophageal_reflux"]:
-                adjusted_score += 0.4
-        elif 18 <= age <= 30:
-            # Higher risk for certain conditions
-            if condition_key in ["pneumothorax"]:
-                adjusted_score += 0.6
-                
-        # Gender-related adjustments
-        if gender.lower() == "male":
-            if condition_key == "myocardial_infarction":
-                adjusted_score += 0.5
-            elif condition_key == "anxiety_panic_attack":
-                adjusted_score -= 0.2
-        elif gender.lower() == "female":
-            if condition_key == "anxiety_panic_attack":
-                adjusted_score += 0.4
-            elif condition_key == "myocardial_infarction":
-                adjusted_score -= 0.3
-                
-        return adjusted_score
-    
-    def _adjust_for_medical_history(self, score: float, condition_key: str, medical_history: List[str]) -> float:
-        """Adjust match score based on medical history."""
-        adjusted_score = score
-        
-        for history_item in medical_history:
-            history_lower = history_item.lower()
-            
-            if "hypertension" in history_lower and condition_key == "hypertensive_crisis":
-                adjusted_score += 0.6
-            elif "asthma" in history_lower and condition_key == "asthma_exacerbation":
-                adjusted_score += 0.7
-            elif "heart" in history_lower and condition_key == "myocardial_infarction":
-                adjusted_score += 0.5
-            elif "blood clot" in history_lower and condition_key == "pulmonary_embolism":
-                adjusted_score += 0.6
-            elif "copd" in history_lower and condition_key in ["pneumonia", "pulmonary_embolism"]:
-                adjusted_score += 0.4
-            elif "diabetes" in history_lower:
-                # Diabetics are at higher risk for various complications
-                adjusted_score += 0.2
-                
-        return adjusted_score
-    
-    def _fuzzy_match(self, term1: str, term2: str) -> bool:
-        """Perform an enhanced fuzzy match between two terms."""
-        # Convert to lowercase for case-insensitive comparison
-        term1, term2 = term1.lower(), term2.lower()
-        
-        # Direct match
-        if term1 == term2:
+
+    def _symptoms_match(self, symptom1: str, symptom2: str) -> bool:
+        """Check if two symptoms match (exact or partial)."""
+        # Exact match
+        if symptom1 == symptom2:
             return True
-            
+        
         # Partial match (one term contained in another)
-        if term1 in term2 or term2 in term1:
+        if symptom1 in symptom2 or symptom2 in symptom1:
             return True
-            
+        
         # Split into words for more detailed comparison
-        words1 = set(term1.split())
-        words2 = set(term2.split())
+        words1 = set(symptom1.split())
+        words2 = set(symptom2.split())
         
         if words1 and words2:
             # Check for exact word matches
@@ -515,46 +336,116 @@ class DifferentialDiagnosisAgent:
                 min_words = min(len(words1), len(words2))
                 if len(common_words) >= max(1, min_words // 2):
                     return True
-            
-            # Check for similar words (partial matches within words)
-            for word1 in words1:
-                for word2 in words2:
-                    if word1 in word2 or word2 in word1:
-                        return True
-                        
-        # Special case for medical terms - check common medical term variations
-        medical_variations = {
-            "heart": ["cardiac", "cardio"],
-            "lung": ["pulmonary", "respiratory"],
-            "brain": ["neurological", "cerebral"],
-            "stomach": ["gastric", "abdominal"],
-            "chest": ["thoracic"],
-            "blood": ["vascular", "circulatory"],
-            "bone": ["skeletal", "orthopedic"],
-            "kidney": ["renal"],
-            "liver": ["hepatic"],
-            "skin": ["dermatological"]
-        }
-        
-        # Check for medical term variations
-        for word1 in words1:
-            if word1 in medical_variations:
-                variations = medical_variations[word1]
-                for variation in variations:
-                    for word2 in words2:
-                        if variation == word2 or variation in word2 or word2 in variation:
-                            return True
-            
-        for word2 in words2:
-            if word2 in medical_variations:
-                variations = medical_variations[word2]
-                for variation in variations:
-                    for word1 in words1:
-                        if variation == word1 or variation in word1 or word1 in variation:
-                            return True
         
         return False
-    
+
+    def _check_vital_indicator(self, indicator: str, vitals: dict) -> bool:
+        """Check if a vital sign indicator is present and abnormal."""
+        # Convert all vital values to appropriate types for comparison
+        vital_indicators = {
+            "high_blood_pressure": lambda v: self._get_blood_pressure_value(v.get("blood_pressure", "")) > 140,
+            "low_blood_pressure": lambda v: self._get_blood_pressure_value(v.get("blood_pressure", "")) < 90,
+            "rapid_heart_rate": lambda v: self._get_int_value(v.get("heart_rate")) > 100,
+            "slow_heart_rate": lambda v: self._get_int_value(v.get("heart_rate")) < 60,
+            "high_temperature": lambda v: self._get_float_value(v.get("temperature")) > 38.0,
+            "low_temperature": lambda v: self._get_float_value(v.get("temperature")) < 36.0,
+            "low_oxygen": lambda v: self._get_float_value(v.get("oxygen_saturation", "").replace("%", "")) < 95,
+            "rapid_breathing": lambda v: self._get_int_value(v.get("respiratory_rate")) > 20,
+            "slow_breathing": lambda v: self._get_int_value(v.get("respiratory_rate")) < 12,
+            "irregular_heartbeat": lambda v: False,  # This would require ECG data
+            "fever": lambda v: self._get_float_value(v.get("temperature")) > 38.0,
+            "hypothermia": lambda v: self._get_float_value(v.get("temperature")) < 35.0
+        }
+        
+        checker = vital_indicators.get(indicator)
+        if checker:
+            return checker(vitals)
+        return False
+
+    def _get_blood_pressure_value(self, bp_str: str) -> int:
+        """Extract systolic blood pressure value from string."""
+        try:
+            if "/" in bp_str:
+                return int(bp_str.split("/")[0])
+            else:
+                return int(bp_str)
+        except (ValueError, IndexError):
+            return 0
+
+    def _get_int_value(self, value) -> int:
+        """Convert value to integer safely."""
+        try:
+            if isinstance(value, str):
+                return int(value)
+            elif isinstance(value, (int, float)):
+                return int(value)
+            else:
+                return 0
+        except (ValueError, TypeError):
+            return 0
+
+    def _get_float_value(self, value) -> float:
+        """Convert value to float safely."""
+        try:
+            if isinstance(value, str):
+                return float(value)
+            elif isinstance(value, (int, float)):
+                return float(value)
+            else:
+                return 0.0
+        except (ValueError, TypeError):
+            return 0.0
+
+    def _adjust_for_demographics(self, score: float, condition_key: str, age: int, gender: str) -> float:
+        """Adjust match score based on demographic factors."""
+        # Age-based adjustments for specific conditions
+        age_adjustments = {
+            "myocardial_infarction": lambda a: 1.5 if a > 40 else 0.7,
+            "pneumonia": lambda a: 1.2 if a < 5 or a > 65 else 1.0,
+            "asthma_exacerbation": lambda a: 1.3 if a < 18 else 1.0,
+            "hypertensive_crisis": lambda a: 1.4 if a > 50 else 0.8
+        }
+        
+        adjustment_func = age_adjustments.get(condition_key)
+        if adjustment_func:
+            score *= adjustment_func(age)
+        
+        # Gender-based adjustments (simplified)
+        # Some conditions are more prevalent in specific genders
+        gender_adjustments = {
+            "prostatitis": lambda g: 2.0 if g.lower() == "male" else 0.1,
+            "menopause": lambda g: 2.0 if g.lower() == "female" else 0.1
+        }
+        
+        gender_func = gender_adjustments.get(condition_key)
+        if gender_func:
+            score *= gender_func(gender)
+        
+        return score
+
+    def _adjust_for_medical_history(self, score: float, condition_key: str, medical_history: List[str]) -> float:
+        """Adjust match score based on medical history."""
+        # Convert medical history to lowercase for comparison
+        history_lower = [h.lower() for h in medical_history]
+        
+        # Risk factor adjustments based on medical history
+        risk_factors = {
+            "myocardial_infarction": ["hypertension", "diabetes", "smoking", "high cholesterol", "family history heart disease"],
+            "pneumonia": ["copd", "asthma", "smoking", "immunocompromised", "diabetes"],
+            "pulmonary_embolism": ["recent surgery", "immobilization", "cancer", "pregnancy", "oral contraceptives"],
+            "diabetes": ["family history diabetes", "obesity", "gestational diabetes"],
+            "hypertensive_crisis": ["hypertension", "kidney disease", "diabetes"]
+        }
+        
+        condition_risks = risk_factors.get(condition_key, [])
+        risk_matches = sum(1 for risk in condition_risks if any(risk in history for history in history_lower))
+        
+        # Increase score based on number of matching risk factors
+        if risk_matches > 0:
+            score *= (1.0 + risk_matches * 0.3)  # 30% increase per matching risk factor
+        
+        return score
+
     def _get_recommendations(self, condition_key: str) -> List[str]:
         """Get recommendations for a specific condition."""
         recommendations = {
@@ -656,122 +547,7 @@ class DifferentialDiagnosisAgent:
         }
         
         return recommendations.get(condition_key, ["Further evaluation recommended"])
-    
-    def _generate_dynamic_diagnoses_nlm(self, symptoms: str, vitals: dict, age: int, gender: str, medical_history: List[str], symptoms_analysis: dict) -> List[Dict[str, Any]]:
-        """Generate and rank possible diagnoses using NLM Conditions API (more accurate)."""
-        diagnoses = []
-        
-        try:
-            # Search using NLM Conditions API
-            nlm_result = search_nlm_conditions(symptoms)
-            
-            # Check if we got a valid response
-            if not isinstance(nlm_result, dict) or nlm_result.get("status") != "success":
-                logger.info("NLM Conditions API not available, falling back to Serper")
-                return []
-            
-            search_results = nlm_result.get("results", [])
-            
-            # Process each search result to create a diagnosis
-            for result in search_results:
-                # Handle dict results from NLM API
-                if isinstance(result, dict):
-                    title = result.get("title", "")
-                    snippet = result.get("snippet", "")
-                    code = result.get("code", "")
-                    match_score = result.get("match_score", 5.0)
-                else:
-                    # If it's not a dict, skip this result
-                    continue
-                
-                diagnoses.append({
-                    "condition": title,
-                    "match_score": match_score,
-                    "matched_symptoms": [],  # Will be populated by frontend
-                    "matched_vitals": [],    # Will be populated by frontend
-                    "severity": self._assess_severity(title, snippet),
-                    "prevalence": min(0.9, match_score / 10.0),  # Normalize prevalence
-                    "recommendations": self._get_dynamic_recommendations(title, snippet),
-                    "description": snippet[:200] + "..." if len(snippet) > 200 else snippet,
-                    "code": code
-                })
-            
-            # Sort by match score
-            diagnoses = sorted(diagnoses, key=lambda x: x["match_score"], reverse=True)
-            
-        except Exception as e:
-            logger.error(f"Error in NLM diagnosis generation: {e}")
-            return []
-        
-        return diagnoses[:8]  # Return top 8 diagnoses for better coverage
-    
-    def _generate_dynamic_diagnoses_serper(self, symptoms: str, vitals: dict, age: int, gender: str, medical_history: List[str], symptoms_analysis: dict) -> List[Dict[str, Any]]:
-        """Generate and rank possible diagnoses using Serper API."""
-        diagnoses = []
-        
-        try:
-            # Search using Serper API
-            serper_result = search_serper(symptoms)
-            
-            # Check if we got a valid response
-            if not isinstance(serper_result, dict) or serper_result.get("status") != "success":
-                logger.info("Serper API not available, falling back to hardcoded conditions")
-                return []
-            
-            search_results = serper_result.get("results", [])
-            
-            # Process each search result to create a diagnosis
-            for result in search_results:
-                # Handle dict results from Serper API
-                if isinstance(result, dict):
-                    title = result.get("title", "")
-                    snippet = result.get("snippet", "")
-                    link = result.get("link", "")
-                else:
-                    # If it's not a dict, skip this result
-                    continue
-                
-                # Filter out non-diagnosis results - only include actual medical conditions
-                if not self._is_medical_diagnosis(title, snippet):
-                    continue
-                
-                # Calculate match score based on relevance
-                match_score = self._calculate_dynamic_match_score(symptoms, title, snippet)
-                
-                # Only include results with significant match
-                if match_score > 4.0:  # Increased threshold for better quality
-                    diagnoses.append({
-                        "condition": self._extract_condition_name(title),
-                        "match_score": round(match_score, 3),
-                        "matched_symptoms": [],  # Will be populated by frontend
-                        "matched_vitals": [],    # Will be populated by frontend
-                        "severity": self._assess_severity(title, snippet),
-                        "prevalence": min(0.9, match_score / 20.0),  # Normalize prevalence
-                        "recommendations": self._get_dynamic_recommendations(title, snippet),
-                        "description": snippet[:200] + "..." if len(snippet) > 200 else snippet
-                    })
-            
-            # Sort by match score
-            diagnoses = sorted(diagnoses, key=lambda x: x["match_score"], reverse=True)
-            
-        except Exception as e:
-            logger.error(f"Error in Serper diagnosis generation: {e}")
-            return []
-        
-        return diagnoses[:4]  # Return top 4 diagnoses (limit as per requirements)
-    
-    def _generate_dynamic_diagnoses(self, symptoms: str, vitals: dict, age: int, gender: str, medical_history: List[str], symptoms_analysis: dict) -> List[Dict[str, Any]]:
-        """Generate and rank possible diagnoses using NLM Conditions API (primary) with Serper API fallback."""
-        # First try NLM Conditions API
-        nlm_diagnoses = self._generate_dynamic_diagnoses_nlm(symptoms, vitals, age, gender, medical_history, symptoms_analysis)
-        
-        # If we have good results, return them
-        if nlm_diagnoses and any(d.get("match_score", 0) > 5.0 for d in nlm_diagnoses):
-            return nlm_diagnoses
-        
-        # Otherwise, fall back to Serper API
-        return self._generate_dynamic_diagnoses_serper(symptoms, vitals, age, gender, medical_history, symptoms_analysis)
-    
+
     def _is_medical_diagnosis(self, title: str, snippet: str) -> bool:
         """Check if the result is a proper medical diagnosis rather than a general medical article."""
         title_lower = title.lower()
@@ -782,7 +558,7 @@ class DifferentialDiagnosisAgent:
             "diabetes", "pneumonia", "asthma", "hypertension", "myocardial infarction",
             "heart attack", "stroke", "migraine", "arthritis", "bronchitis", "appendicitis",
             "gastritis", "ulcer", "anemia", "thyroid", "depression", "anxiety", "allergy",
-            "infection", "fracture", "sprain", "strain", "concussion", "migraine", "epilepsy",
+            "infection", "fracture", "sprain", "strain", "concussion", "epilepsy",
             "seizure", "cirrhosis", "hepatitis", "nephritis", "cystitis", "dermatitis",
             "eczema", "psoriasis", "osteoporosis", "osteopenia", "meningitis", "encephalitis",
             "tuberculosis", "malaria", "dengue", "chickenpox", "measles", "mumps", "rubella",

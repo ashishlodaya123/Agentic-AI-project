@@ -11,5 +11,6 @@ torchvision
 prometheus-client
 pydantic
 requests
+aiohttp
 python-dotenv
 scikit-learn

@@ -70,10 +70,19 @@ async def check_drug_interactions(request: AgentRequest):
     """
     try:
         agent = DrugInteractionAgent()
-        result = agent.run(
-            request.patient_data,
-            request.treatment_recommendations or {}
-        )
+        # Run the agent in a thread pool to avoid blocking the event loop
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        
+        def run_agent():
+            return agent.run(
+                request.patient_data,
+                request.treatment_recommendations or {}
+            )
+        
+        with ThreadPoolExecutor() as executor:
+            result = await asyncio.get_event_loop().run_in_executor(executor, run_agent)
+        
         return AgentResponse(success=True, data=result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -86,12 +95,21 @@ async def get_specialist_recommendations(request: AgentRequest):
     """
     try:
         agent = SpecialistConsultationAgent()
-        result = agent.run(
-            request.patient_data,
-            request.symptoms_analysis or {},
-            request.risk_assessment or {},
-            request.treatment_recommendations or {}
-        )
+        # Run the agent in a thread pool to avoid blocking the event loop
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        
+        def run_agent():
+            return agent.run(
+                request.patient_data,
+                request.symptoms_analysis or {},
+                request.risk_assessment or {},
+                request.treatment_recommendations or {}
+            )
+        
+        with ThreadPoolExecutor() as executor:
+            result = await asyncio.get_event_loop().run_in_executor(executor, run_agent)
+        
         return AgentResponse(success=True, data=result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -104,15 +122,24 @@ async def run_quality_assurance(request: AgentRequest):
     """
     try:
         agent = QualityAssuranceAgent()
-        result = agent.run(
-            request.patient_data,
-            request.symptoms_analysis or {},
-            request.risk_assessment or {},
-            request.treatment_recommendations or {},
-            request.followup_plan or {},
-            request.drug_interactions or {},
-            request.specialist_recommendations or {}
-        )
+        # Run the agent in a thread pool to avoid blocking the event loop
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        
+        def run_agent():
+            return agent.run(
+                request.patient_data,
+                request.symptoms_analysis or {},
+                request.risk_assessment or {},
+                request.treatment_recommendations or {},
+                request.followup_plan or {},
+                request.drug_interactions or {},
+                request.specialist_recommendations or {}
+            )
+        
+        with ThreadPoolExecutor() as executor:
+            result = await asyncio.get_event_loop().run_in_executor(executor, run_agent)
+        
         return AgentResponse(success=True, data=result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -125,11 +152,20 @@ async def get_differential_diagnosis(request: AgentRequest):
     """
     try:
         agent = DifferentialDiagnosisAgent()
-        result = agent.run(
-            request.patient_data,
-            request.symptoms_analysis or {},
-            request.risk_assessment or {}
-        )
+        # Run the agent in a thread pool to avoid blocking the event loop
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        
+        def run_agent():
+            return agent.run(
+                request.patient_data,
+                request.symptoms_analysis or {},
+                request.risk_assessment or {}
+            )
+        
+        with ThreadPoolExecutor() as executor:
+            result = await asyncio.get_event_loop().run_in_executor(executor, run_agent)
+        
         return AgentResponse(success=True, data=result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -142,12 +178,21 @@ async def get_predictive_analytics(request: AgentRequest):
     """
     try:
         agent = PredictiveAnalyticsAgent()
-        result = agent.run(
-            request.patient_data,
-            request.symptoms_analysis or {},
-            request.risk_assessment or {},
-            request.treatment_recommendations or {}
-        )
+        # Run the agent in a thread pool to avoid blocking the event loop
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        
+        def run_agent():
+            return agent.run(
+                request.patient_data,
+                request.symptoms_analysis or {},
+                request.risk_assessment or {},
+                request.treatment_recommendations or {}
+            )
+        
+        with ThreadPoolExecutor() as executor:
+            result = await asyncio.get_event_loop().run_in_executor(executor, run_agent)
+        
         return AgentResponse(success=True, data=result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -160,15 +205,24 @@ async def get_clinical_visualization(request: AgentRequest):
     """
     try:
         agent = ClinicalVisualizationAgent()
-        result = agent.run(
-            request.patient_data,
-            request.symptoms_analysis or {},
-            request.risk_assessment or {},
-            request.treatment_recommendations or {},
-            request.followup_plan,
-            request.drug_interactions,
-            request.specialist_recommendations
-        )
+        # Run the agent in a thread pool to avoid blocking the event loop
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        
+        def run_agent():
+            return agent.run(
+                request.patient_data,
+                request.symptoms_analysis or {},
+                request.risk_assessment or {},
+                request.treatment_recommendations or {},
+                request.followup_plan,
+                request.drug_interactions,
+                request.specialist_recommendations
+            )
+        
+        with ThreadPoolExecutor() as executor:
+            result = await asyncio.get_event_loop().run_in_executor(executor, run_agent)
+        
         return AgentResponse(success=True, data=result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

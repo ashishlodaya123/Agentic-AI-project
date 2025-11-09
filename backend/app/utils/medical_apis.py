@@ -7,6 +7,65 @@ These are examples of how external data sources could be integrated.
 import os
 import requests
 from app.core.config import settings
+import asyncio
+import aiohttp
+from datetime import datetime, timedelta
+from typing import Dict, Any
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Circuit breaker pattern implementation
+class CircuitBreaker:
+    def __init__(self, failure_threshold: int = 3, recovery_timeout: int = 30):  # Reduce recovery timeout from 60 to 30 seconds
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.failure_count = 0
+        self.last_failure_time = None
+        self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
+    
+    def call(self, func, *args, **kwargs):
+        if self.state == "OPEN":
+            if self.last_failure_time and datetime.now() - self.last_failure_time > timedelta(seconds=self.recovery_timeout):
+                self.state = "HALF_OPEN"
+            else:
+                raise Exception("Circuit breaker is OPEN")
+        
+        try:
+            result = func(*args, **kwargs)
+            self.on_success()
+            return result
+        except Exception as e:
+            self.on_failure()
+            raise e
+    
+    async def async_call(self, func, *args, **kwargs):
+        if self.state == "OPEN":
+            if self.last_failure_time and datetime.now() - self.last_failure_time > timedelta(seconds=self.recovery_timeout):
+                self.state = "HALF_OPEN"
+            else:
+                raise Exception("Circuit breaker is OPEN")
+        
+        try:
+            result = await func(*args, **kwargs)
+            self.on_success()
+            return result
+        except Exception as e:
+            self.on_failure()
+            raise e
+    
+    def on_success(self):
+        self.failure_count = 0
+        self.state = "CLOSED"
+    
+    def on_failure(self):
+        self.failure_count += 1
+        self.last_failure_time = datetime.now()
+        if self.failure_count >= self.failure_threshold:
+            self.state = "OPEN"
+
+# Create circuit breakers for each external service
+serper_circuit_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=60)
 
 def search_medline(query: str, max_results: int = 5):
     """
@@ -182,46 +241,64 @@ def search_serper(query: str):
     if not api_key:
         return {"error": "Serper API key not configured"}
     
+    def _make_request():
+        try:
+            # Serper API endpoint for Google search
+            url = "https://google.serper.dev/search"
+            
+            payload = {
+                "q": f"medical diagnosis symptoms {query}",
+                "num": 8  # Increase from 5 to 8 for better coverage
+            }
+            headers = {
+                'X-API-KEY': api_key,
+                'Content-Type': 'application/json'
+            }
+            
+            response = requests.post(url, json=payload, headers=headers, timeout=3)  # Reduce timeout from 5 to 3 seconds
+            response.raise_for_status()
+            data = response.json()
+            
+            # Extract relevant medical information
+            results = []
+            if 'organic' in data:
+                # Increase limit to top 5 results to get more diagnoses
+                for item in data['organic'][:5]:
+                    title = item.get('title', '')
+                    snippet = item.get('snippet', '')
+                    # Loosen the filtering criteria to allow more medical conditions through
+                    # but still filter out clearly non-medical content
+                    non_medical_indicators = ['guideline', 'protocol', 'procedure', 'treatment', 'therapy',
+                                            'management', 'care', 'practice', 'policy', 'standard', 'recommendation',
+                                            'algorithm', 'approach', 'strategy', 'framework', 'model', 'system',
+                                            'program', 'initiative', 'campaign', 'study', 'research', 'trial',
+                                            'review', 'meta-analysis', 'analysis', 'evaluation', 'assessment']
+                    
+                    # Check if it's clearly non-medical
+                    is_non_medical = any(indicator in title.lower() or indicator in snippet.lower() 
+                                        for indicator in non_medical_indicators)
+                    
+                    # Include if it's not clearly non-medical and contains medical terms
+                    if not is_non_medical and (len(title) > 0):
+                        results.append({
+                            "title": title,
+                            "snippet": snippet,
+                            "link": item.get('link', ''),
+                            "match_score": 7.0  # Give a reasonable default score
+                        })
+            
+            return {
+                "status": "success",
+                "query": query,
+                "results": results,
+                "count": len(results)
+            }
+        except Exception as e:
+            logger.error(f"Error in Serper API call: {e}")
+            raise
+    
     try:
-        # Serper API endpoint for Google search
-        url = "https://google.serper.dev/search"
-        
-        payload = {
-            "q": f"medical diagnosis symptoms {query}",
-            "num": 10
-        }
-        headers = {
-            'X-API-KEY': api_key,
-            'Content-Type': 'application/json'
-        }
-        
-        response = requests.post(url, json=payload, headers=headers, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        
-        # Extract relevant medical information
-        results = []
-        if 'organic' in data:
-            for item in data['organic']:
-                title = item.get('title', '')
-                snippet = item.get('snippet', '')
-                # Only include results that seem medically relevant
-                if any(keyword in title.lower() or keyword in snippet.lower() 
-                       for keyword in ['symptom', 'diagnosis', 'medical', 'condition', 'disease', 'treatment']):
-                    results.append({
-                        "title": title,
-                        "snippet": snippet,
-                        "link": item.get('link', ''),
-                        "match_score": 7.0  # Give a reasonable default score
-                    })
-        
-        return {
-            "status": "success",
-            "query": query,
-            "results": results,
-            "count": len(results)
-        }
-        
+        return serper_circuit_breaker.call(_make_request)
     except Exception as e:
         return {
             "status": "error",
@@ -252,7 +329,7 @@ def search_nlm_conditions(symptoms: str):
         }
         
         # Make the request to NLM Conditions API
-        response = requests.get(base_url, params=params, headers=headers, timeout=15)
+        response = requests.get(base_url, params=params, headers=headers, timeout=5)
         response.raise_for_status()
         data = response.json()
         
@@ -292,6 +369,84 @@ def search_nlm_conditions(symptoms: str):
             "status": "error",
             "error": f"Failed to search NLM Conditions: {str(e)}",
             "query": symptoms
+        }
+
+# Add async versions of the API functions
+
+async def async_search_serper(query: str):
+    """
+    Async version of search_serper using aiohttp for better performance.
+    """
+    api_key = getattr(settings, 'SERPER_API_KEY', None)
+    if not api_key:
+        return {"error": "Serper API key not configured"}
+    
+    async def _make_request():
+        try:
+            # Serper API endpoint for Google search
+            url = "https://google.serper.dev/search"
+            
+            payload = {
+                "q": f"medical diagnosis symptoms {query}",
+                "num": 8  # Increase from 5 to 8 for better coverage
+            }
+            headers = {
+                'X-API-KEY': api_key,
+                'Content-Type': 'application/json'
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=3)) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        
+                        # Extract relevant medical information
+                        results = []
+                        if 'organic' in data:
+                            # Increase limit to top 5 results to get more diagnoses
+                            for item in data['organic'][:5]:
+                                title = item.get('title', '')
+                                snippet = item.get('snippet', '')
+                                # Loosen the filtering criteria to allow more medical conditions through
+                                # but still filter out clearly non-medical content
+                                non_medical_indicators = ['guideline', 'protocol', 'procedure', 'treatment', 'therapy',
+                                                        'management', 'care', 'practice', 'policy', 'standard', 'recommendation',
+                                                        'algorithm', 'approach', 'strategy', 'framework', 'model', 'system',
+                                                        'program', 'initiative', 'campaign', 'study', 'research', 'trial',
+                                                        'review', 'meta-analysis', 'analysis', 'evaluation', 'assessment']
+                                
+                                # Check if it's clearly non-medical
+                                is_non_medical = any(indicator in title.lower() or indicator in snippet.lower() 
+                                                    for indicator in non_medical_indicators)
+                                
+                                # Include if it's not clearly non-medical and contains medical terms
+                                if not is_non_medical and (len(title) > 0):
+                                    results.append({
+                                        "title": title,
+                                        "snippet": snippet,
+                                        "link": item.get('link', ''),
+                                        "match_score": 7.0  # Give a reasonable default score
+                                    })
+                        
+                        return {
+                            "status": "success",
+                            "query": query,
+                            "results": results,
+                            "count": len(results)
+                        }
+                    else:
+                        raise Exception(f"HTTP {response.status}")
+        except Exception as e:
+            logger.error(f"Error in async Serper API call: {e}")
+            raise
+    
+    try:
+        return await serper_circuit_breaker.async_call(_make_request)
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": f"Failed to search Serper: {str(e)}",
+            "query": query
         }
 
 # Example of how these functions could be integrated into the RAG agent
