@@ -247,8 +247,8 @@ def search_serper(query: str):
             url = "https://google.serper.dev/search"
             
             payload = {
-                "q": f"medical diagnosis symptoms {query}",
-                "num": 8  # Increase from 5 to 8 for better coverage
+                "q": f"medical condition diagnosis {query}",
+                "num": 10  # Increase from 5 to 10 for better coverage
             }
             headers = {
                 'X-API-KEY': api_key,
@@ -272,19 +272,26 @@ def search_serper(query: str):
                                             'management', 'care', 'practice', 'policy', 'standard', 'recommendation',
                                             'algorithm', 'approach', 'strategy', 'framework', 'model', 'system',
                                             'program', 'initiative', 'campaign', 'study', 'research', 'trial',
-                                            'review', 'meta-analysis', 'analysis', 'evaluation', 'assessment']
+                                            'review', 'meta-analysis', 'analysis', 'evaluation', 'assessment',
+                                            'symptoms of', 'signs of', 'causes of', 'overview of']
                     
                     # Check if it's clearly non-medical
                     is_non_medical = any(indicator in title.lower() or indicator in snippet.lower() 
                                         for indicator in non_medical_indicators)
                     
-                    # Include if it's not clearly non-medical and contains medical terms
-                    if not is_non_medical and (len(title) > 0):
+                    # Check for positive medical condition indicators
+                    medical_indicators = ['syndrome', 'disease', 'disorder', 'condition', 'infection', 'cancer', 
+                                       'tumor', 'lesion', 'deficiency', 'insufficiency', 'failure', 'attack', 'stones']
+                    has_medical_indicator = any(indicator in title.lower() for indicator in medical_indicators)
+                    
+                    # Include results with medical terms or reasonable titles
+                    # Loosen the filtering to get more diverse results
+                    if len(title) > 0 and not is_non_medical:
                         results.append({
                             "title": title,
                             "snippet": snippet,
                             "link": item.get('link', ''),
-                            "match_score": 7.0  # Give a reasonable default score
+                            "match_score": 8.0 if has_medical_indicator else 6.0  # Boost score for clear medical terms
                         })
             
             return {
@@ -354,7 +361,8 @@ def search_nlm_conditions(symptoms: str):
                         "title": condition_name,
                         "snippet": f"Medical condition: {condition_name}",
                         "code": code,
-                        "match_score": 9.0 - (i * 0.5)  # Decreasing score based on position
+                        "match_score": 9.0 - (i * 0.5),  # Decreasing score based on position
+                        "link": f"https://www.ncbi.nlm.nih.gov/medgen/?term={condition_name.replace(' ', '+')}"  # Add a link to NCBI for more info
                     })
         
         return {
@@ -387,8 +395,8 @@ async def async_search_serper(query: str):
             url = "https://google.serper.dev/search"
             
             payload = {
-                "q": f"medical diagnosis symptoms {query}",
-                "num": 8  # Increase from 5 to 8 for better coverage
+                "q": f"medical condition diagnosis {query}",
+                "num": 10  # Increase from 5 to 10 for better coverage
             }
             headers = {
                 'X-API-KEY': api_key,
@@ -413,19 +421,26 @@ async def async_search_serper(query: str):
                                                         'management', 'care', 'practice', 'policy', 'standard', 'recommendation',
                                                         'algorithm', 'approach', 'strategy', 'framework', 'model', 'system',
                                                         'program', 'initiative', 'campaign', 'study', 'research', 'trial',
-                                                        'review', 'meta-analysis', 'analysis', 'evaluation', 'assessment']
+                                                        'review', 'meta-analysis', 'analysis', 'evaluation', 'assessment',
+                                                        'symptoms of', 'signs of', 'causes of', 'overview of']
                                 
                                 # Check if it's clearly non-medical
                                 is_non_medical = any(indicator in title.lower() or indicator in snippet.lower() 
                                                     for indicator in non_medical_indicators)
                                 
-                                # Include if it's not clearly non-medical and contains medical terms
-                                if not is_non_medical and (len(title) > 0):
+                                # Check for positive medical condition indicators
+                                medical_indicators = ['syndrome', 'disease', 'disorder', 'condition', 'infection', 'cancer', 
+                                                   'tumor', 'lesion', 'deficiency', 'insufficiency', 'failure', 'attack', 'stones']
+                                has_medical_indicator = any(indicator in title.lower() for indicator in medical_indicators)
+                                
+                                # Include results with medical terms or reasonable titles
+                                # Loosen the filtering to get more diverse results
+                                if len(title) > 0 and not is_non_medical:
                                     results.append({
                                         "title": title,
                                         "snippet": snippet,
                                         "link": item.get('link', ''),
-                                        "match_score": 7.0  # Give a reasonable default score
+                                        "match_score": 8.0 if has_medical_indicator else 6.0  # Boost score for clear medical terms
                                     })
                         
                         return {

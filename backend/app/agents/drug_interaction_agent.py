@@ -10,7 +10,7 @@ class DrugInteractionAgent:
     def __init__(self):
         self.memory = get_agent_memory()
         
-        # Drug interaction database
+        # Enhanced drug interaction database with more comprehensive interactions
         self.drug_interactions = {
             "aspirin": {
                 "warfarin": {
@@ -32,6 +32,11 @@ class DrugInteractionAgent:
                     "severity": "high",
                     "description": "Additive anticoagulant effect increases bleeding risk",
                     "management": "Avoid concurrent use, monitor coagulation parameters"
+                },
+                "corticosteroids": {
+                    "severity": "moderate",
+                    "description": "Increased risk of GI bleeding and ulceration",
+                    "management": "Use with caution, consider gastroprotective agents"
                 }
             },
             "nitroglycerin": {
@@ -66,6 +71,11 @@ class DrugInteractionAgent:
                     "severity": "moderate",
                     "description": "Reduced antihypertensive effect, risk of renal impairment",
                     "management": "Monitor blood pressure and renal function, avoid concurrent use if possible"
+                },
+                "diuretics": {
+                    "severity": "moderate",
+                    "description": "Increased risk of hypotension and renal impairment",
+                    "management": "Monitor blood pressure and renal function"
                 }
             },
             "warfarin": {
@@ -83,6 +93,16 @@ class DrugInteractionAgent:
                     "severity": "moderate",
                     "description": "Increased INR due to CYP2C9 inhibition",
                     "management": "Monitor INR, consider temporary discontinuation"
+                },
+                "omeprazole": {
+                    "severity": "moderate",
+                    "description": "Increased INR due to CYP2C19 inhibition",
+                    "management": "Monitor INR, consider alternative PPI"
+                },
+                "simvastatin": {
+                    "severity": "moderate",
+                    "description": "Increased risk of myopathy",
+                    "management": "Monitor for muscle pain, consider dose reduction"
                 }
             },
             "digoxin": {
@@ -90,6 +110,35 @@ class DrugInteractionAgent:
                     "severity": "moderate",
                     "description": "Increased digoxin levels, risk of toxicity",
                     "management": "Monitor digoxin levels, reduce dose by 50%"
+                },
+                "verapamil": {
+                    "severity": "moderate",
+                    "description": "Increased digoxin levels due to reduced clearance",
+                    "management": "Monitor digoxin levels, reduce dose by 50%"
+                }
+            },
+            "statins": {
+                "clarithromycin": {
+                    "severity": "high",
+                    "description": "Increased statin levels, risk of myopathy/rhabdomyolysis",
+                    "management": "Avoid concurrent use, consider alternative antibiotic"
+                },
+                "cyclosporine": {
+                    "severity": "high",
+                    "description": "Increased statin levels, risk of myopathy/rhabdomyolysis",
+                    "management": "Avoid concurrent use, consider alternative immunosuppressant"
+                },
+                "gemfibrozil": {
+                    "severity": "high",
+                    "description": "Increased statin levels, risk of myopathy/rhabdomyolysis",
+                    "management": "Avoid concurrent use, consider alternative lipid-lowering agent"
+                }
+            },
+            "metformin": {
+                "contrast_media": {
+                    "severity": "moderate",
+                    "description": "Risk of lactic acidosis in patients with renal impairment",
+                    "management": "Withhold metformin before procedure, reassess renal function"
                 }
             }
         }
@@ -187,13 +236,26 @@ class DrugInteractionAgent:
         return list(set(medications))  # Remove duplicates
 
     def _extract_medications_from_text(self, recommendations: List[str]) -> List[str]:
-        """Extract medication names from text recommendations."""
+        """Extract medication names from text recommendations with enhanced matching."""
         medications = []
+        # Enhanced medication keywords with more comprehensive drug classes and specific drugs
         medication_keywords = [
             "aspirin", "nitroglycerin", "warfarin", "clopidogrel", "ibuprofen",
             "sildenafil", "tadalafil", "vardenafil", "ace inhibitors", "arb", 
             "potassium", "spironolactone", "amiodarone", "fluconazole", "oxygen",
-            "digoxin", "heparin", "metronidazole", "nsaids", "furosemide"
+            "digoxin", "heparin", "metronidazole", "nsaids", "furosemide",
+            "metformin", "insulin", "lisinopril", "atorvastatin", "simvastatin",
+            "omeprazole", "pantoprazole", "amoxicillin", "azithromycin", "levofloxacin",
+            "prednisone", "hydrocortisone", "albuterol", "salbutamol", "ipratropium",
+            "fentanyl", "morphine", "oxycodone", "tramadol", "gabapentin",
+            "sertraline", "fluoxetine", "escitalopram", "venlafaxine", "bupropion",
+            "loratadine", "cetirizine", "diphenhydramine", "montelukast", "theophylline",
+            "warfarin", "rivaroxaban", "apixaban", "dabigatran", "clopidogrel",
+            "metoprolol", "carvedilol", "atenolol", "propranolol", "verapamil",
+            "amlodipine", "nifedipine", "diltiazem", "hydrochlorothiazide", "furosemide",
+            "spironolactone", "eplerenone", "losartan", "valsartan", "telmisartan",
+            "levothyroxine", "methimazole", "propylthiouracil", "insulin glargine",
+            "insulin lispro", "insulin aspart", "sitagliptin", "saxagliptin", "linagliptin"
         ]
         
         for recommendation in recommendations:
@@ -201,15 +263,40 @@ class DrugInteractionAgent:
             rec_lower = recommendation.lower()
             for keyword in medication_keywords:
                 if keyword.lower() in rec_lower:
-                    medications.append(keyword.lower())
+                    # Normalize drug names to match database keys
+                    normalized_name = self._normalize_drug_name(keyword.lower())
+                    medications.append(normalized_name)
                     
         return list(set(medications))  # Remove duplicates and return unique medications
+    
+    def _normalize_drug_name(self, drug_name: str) -> str:
+        """Normalize drug names to match database keys."""
+        # Map common drug names to database keys
+        name_mapping = {
+            "lisinopril": "ace_inhibitors",
+            "enalapril": "ace_inhibitors",
+            "ramipril": "ace_inhibitors",
+            "losartan": "arb",
+            "valsartan": "arb",
+            "telmisartan": "arb",
+            "atorvastatin": "statins",
+            "simvastatin": "statins",
+            "rosuvastatin": "statins",
+            "pravastatin": "statins",
+            "nsaid": "nsaids",
+            "naproxen": "nsaids",
+            "diclofenac": "nsaids",
+            "celecoxib": "nsaids"
+        }
+        
+        return name_mapping.get(drug_name, drug_name)
 
     def _check_drug_interactions(self, proposed_medications: List[str], 
                                 current_medications: List[str]) -> List[Dict[str, Any]]:
-        """Check for potential drug interactions between proposed and current medications."""
+        """Check for potential drug interactions between proposed and current medications with enhanced coverage."""
         interactions_found = []
         
+        # Check using our primary database
         # Check each proposed medication against current medications
         for proposed in proposed_medications:
             if proposed in self.drug_interactions:
@@ -239,7 +326,20 @@ class DrugInteractionAgent:
                             "management": interaction_details["management"]
                         })
         
-        return interactions_found
+        # Check using enhanced external database for additional coverage
+        external_interactions = self._check_external_drug_interactions(proposed_medications, current_medications)
+        interactions_found.extend(external_interactions)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_interactions = []
+        for interaction in interactions_found:
+            interaction_key = (interaction["drug1"], interaction["drug2"])
+            if interaction_key not in seen:
+                seen.add(interaction_key)
+                unique_interactions.append(interaction)
+        
+        return unique_interactions
 
     def _check_contraindications(self, proposed_medications: List[str], medical_history: List[str],
                                 age: int, gender: str, symptoms: str, vitals: dict) -> List[Dict[str, Any]]:
@@ -426,3 +526,110 @@ class DrugInteractionAgent:
             confidence = base_confidence
             
         return round(confidence, 3)
+    
+    def _check_external_drug_interactions(self, proposed_medications: List[str], 
+                                         current_medications: List[str]) -> List[Dict[str, Any]]:
+        """Check for drug interactions using external databases for more comprehensive coverage."""
+        interactions_found = []
+        
+        # This is a placeholder for integration with external drug interaction databases
+        # In a real implementation, this would connect to databases like:
+        # - DrugBank
+        # - RxNorm
+        # - FDA drug interaction databases
+        # - Clinical pharmacology databases
+        
+        # For now, we'll simulate enhanced checking by looking for additional interactions
+        # that might not be in our hardcoded database
+        
+        # Enhanced interaction database (simulated external data)
+        enhanced_interactions = {
+            "warfarin": {
+                "amiodarone": {
+                    "severity": "high",
+                    "description": "Increased INR due to CYP2C9 inhibition",
+                    "management": "Monitor INR frequently, reduce warfarin dose"
+                },
+                "fluconazole": {
+                    "severity": "high",
+                    "description": "Increased INR due to CYP2C9 inhibition",
+                    "management": "Monitor INR frequently, reduce warfarin dose"
+                },
+                "metronidazole": {
+                    "severity": "moderate",
+                    "description": "Increased INR due to CYP2C9 inhibition",
+                    "management": "Monitor INR, consider temporary discontinuation"
+                },
+                "omeprazole": {
+                    "severity": "moderate",
+                    "description": "Increased INR due to CYP2C19 inhibition",
+                    "management": "Monitor INR, consider alternative PPI"
+                }
+            },
+            "digoxin": {
+                "amiodarone": {
+                    "severity": "moderate",
+                    "description": "Increased digoxin levels, risk of toxicity",
+                    "management": "Monitor digoxin levels, reduce dose by 50%"
+                },
+                "verapamil": {
+                    "severity": "moderate",
+                    "description": "Increased digoxin levels due to reduced clearance",
+                    "management": "Monitor digoxin levels, reduce dose by 50%"
+                }
+            },
+            "statins": {
+                "clarithromycin": {
+                    "severity": "high",
+                    "description": "Increased statin levels, risk of myopathy/rhabdomyolysis",
+                    "management": "Avoid concurrent use, consider alternative antibiotic"
+                },
+                "cyclosporine": {
+                    "severity": "high",
+                    "description": "Increased statin levels, risk of myopathy/rhabdomyolysis",
+                    "management": "Avoid concurrent use, consider alternative immunosuppressant"
+                },
+                "gemfibrozil": {
+                    "severity": "high",
+                    "description": "Increased statin levels, risk of myopathy/rhabdomyolysis",
+                    "management": "Avoid concurrent use, consider alternative lipid-lowering agent"
+                }
+            }
+        }
+        
+        # Check each proposed medication against current medications
+        for proposed in proposed_medications:
+            # Normalize drug names for better matching
+            normalized_proposed = self._normalize_drug_name(proposed)
+            
+            if normalized_proposed in enhanced_interactions:
+                for current in current_medications:
+                    normalized_current = self._normalize_drug_name(current)
+                    if normalized_current in enhanced_interactions[normalized_proposed]:
+                        interaction_details = enhanced_interactions[normalized_proposed][normalized_current]
+                        interactions_found.append({
+                            "drug1": proposed,
+                            "drug2": current,
+                            "severity": interaction_details["severity"],
+                            "description": interaction_details["description"],
+                            "management": interaction_details["management"]
+                        })
+        
+        # Check for interactions within proposed medications
+        for i, drug1 in enumerate(proposed_medications):
+            normalized_drug1 = self._normalize_drug_name(drug1)
+            if normalized_drug1 in enhanced_interactions:
+                for j in range(i + 1, len(proposed_medications)):
+                    drug2 = proposed_medications[j]
+                    normalized_drug2 = self._normalize_drug_name(drug2)
+                    if normalized_drug2 in enhanced_interactions[normalized_drug1]:
+                        interaction_details = enhanced_interactions[normalized_drug1][normalized_drug2]
+                        interactions_found.append({
+                            "drug1": drug1,
+                            "drug2": drug2,
+                            "severity": interaction_details["severity"],
+                            "description": interaction_details["description"],
+                            "management": interaction_details["management"]
+                        })
+        
+        return interactions_found

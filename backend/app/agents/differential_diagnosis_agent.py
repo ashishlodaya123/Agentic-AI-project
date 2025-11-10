@@ -150,17 +150,10 @@ class DifferentialDiagnosisAgent:
             else:
                 combined_symptoms = symptoms
             
-            # Generate dynamic diagnoses using Serper API as primary source
-            dynamic_diagnoses = self._generate_dynamic_diagnoses_serper(combined_symptoms, vitals, age, gender, medical_history, symptoms_analysis)
+            # Generate enhanced diagnoses using multiple sources (NLM > Serper > Hardcoded)
+            diagnosis_list = self._generate_enhanced_diagnoses(combined_symptoms, vitals, age, gender, medical_history, symptoms_analysis)
             
-            # If we have dynamic diagnoses with good matches, use them; otherwise fall back to hardcoded conditions
-            if dynamic_diagnoses and any(d.get("match_score", 0) > 4.0 for d in dynamic_diagnoses):
-                diagnosis_list = dynamic_diagnoses
-                logger.info(f"Using dynamic diagnoses with {len(diagnosis_list)} results")
-            else:
-                # Generate differential diagnosis from hardcoded conditions
-                logger.info("Falling back to hardcoded conditions")
-                diagnosis_list = self._generate_diagnoses(combined_symptoms, vitals, age, gender, medical_history, symptoms_analysis)
+            logger.info(f"Using enhanced diagnoses with {len(diagnosis_list)} results")
             
             # Rank diagnoses based on match score
             ranked_diagnoses = sorted(diagnosis_list, key=lambda x: x["match_score"], reverse=True)
@@ -230,16 +223,32 @@ class DifferentialDiagnosisAgent:
                 
                 # Include results with moderate match to increase diagnosis count
                 if match_score > 3.0:  # Lowered threshold to get more diagnoses
-                    diagnoses.append({
-                        "condition": self._extract_condition_name(title),
-                        "match_score": round(match_score, 3),
-                        "matched_symptoms": [],  # Will be populated by frontend
-                        "matched_vitals": [],    # Will be populated by frontend
-                        "severity": self._assess_severity(title, snippet),
-                        "prevalence": min(0.9, match_score / 20.0),  # Normalize prevalence
-                        "recommendations": self._get_dynamic_recommendations(title, snippet),
-                        "description": snippet[:200] + "..." if len(snippet) > 200 else snippet
-                    })
+                    # Enhanced description handling to avoid truncation in the middle of sentences
+                    clean_description = self._clean_description(snippet)
+                    # Special handling for known problematic truncations
+                    clean_title = title
+                    if "asthma and anaphylaxis" in title.lower() and "asthma and anaphylaxis in the" in title.lower():
+                        clean_title = "Asthma And Anaphylaxis"
+                    else:
+                        clean_title = self._extract_condition_name(title)
+                    
+                    # Further refine the condition name to ensure it's the actual diagnosis
+                    final_condition = self._refine_condition_name(clean_title, title, snippet)
+                    
+                    # Loosen filtering to allow more medical conditions through
+                    # Only filter out clearly non-medical content
+                    if len(final_condition) > 2 and not any(term in final_condition.lower() for term in ["symptom", "sign", "cause", "treatment", "therapy", "overview", "introduction"]):
+                        diagnoses.append({
+                            "condition": final_condition,
+                            "match_score": round(match_score, 3),
+                            "matched_symptoms": [],  # Will be populated by frontend
+                            "matched_vitals": [],    # Will be populated by frontend
+                            "severity": self._assess_severity(title, snippet),
+                            "prevalence": min(0.9, match_score / 20.0),  # Normalize prevalence
+                            "recommendations": self._get_dynamic_recommendations(title, snippet),
+                            "description": clean_description,
+                            "link": link  # Include the search result link
+                        })
             
             # Sort by match score
             diagnoses = sorted(diagnoses, key=lambda x: x["match_score"], reverse=True)
@@ -309,7 +318,8 @@ class DifferentialDiagnosisAgent:
                     "matched_vitals": matched_vitals,
                     "severity": condition_data.get("severity", "moderate"),
                     "prevalence": prevalence,
-                    "recommendations": self._get_recommendations(condition_key)
+                    "recommendations": self._get_recommendations(condition_key),
+                    "source": "Hardcoded Database"  # Indicate the source for transparency
                 })
         
         return diagnoses
@@ -395,6 +405,33 @@ class DifferentialDiagnosisAgent:
                 return 0.0
         except (ValueError, TypeError):
             return 0.0
+
+    def _refine_condition_name(self, clean_title: str, original_title: str, snippet: str) -> str:
+        """Further refine the condition name to ensure it's the actual diagnosis."""
+        # If we already have a clean title, use it
+        if clean_title and len(clean_title) > 3:
+            # Check if it's not a generic term
+            generic_terms = ["symptoms", "signs", "causes", "treatment", "diagnosis", "medical", "health", "condition", "overview", "introduction"]
+            if not any(term in clean_title.lower() for term in generic_terms):
+                return clean_title
+        
+        # Try to extract a better condition name from the original title
+        import re
+        
+        # Look for common medical condition patterns
+        medical_pattern = r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Syndrome|Disease|Disorder|Condition|Infection|Cancer|Tumor|Lesion|Deficiency|Insufficiency|Failure))\b'
+        match = re.search(medical_pattern, original_title)
+        if match:
+            return match.group(1).strip()
+        
+        # Look for common conditions like "Heart Attack", "Kidney Stones"
+        common_pattern = r'\b([A-Z][a-z]+\s+(?:Attack|Stones|Pain|Injury|Infection))\b'
+        match = re.search(common_pattern, original_title)
+        if match:
+            return match.group(1).strip()
+        
+        # If no pattern matched, return the clean title or original title
+        return clean_title if len(clean_title) > 3 else original_title.strip()
 
     def _adjust_for_demographics(self, score: float, condition_key: str, age: int, gender: str) -> float:
         """Adjust match score based on demographic factors."""
@@ -789,6 +826,11 @@ class DifferentialDiagnosisAgent:
         # Start with the original title
         condition = title.strip()
         
+        # Special handling for known problematic truncations
+        title_lower = title.lower()
+        if "asthma and anaphylaxis" in title_lower and "asthma and anaphylaxis in the" in title_lower:
+            return "Asthma And Anaphylaxis"
+        
         # Remove common prefixes and suffixes that indicate educational content
         educational_prefixes = [
             "Symptoms of", "Diagnosis of", "Treatment for", "Causes of", "Signs of", 
@@ -811,8 +853,8 @@ class DifferentialDiagnosisAgent:
             ]
             if len(parts[0]) < 30 and any(prefix in parts[0].lower() for prefix in institutional_prefixes):
                 condition = " - ".join(parts[1:])
-            else:
-                condition = parts[0]  # Take the first part as the condition name
+            # Otherwise, keep the full condition name to avoid truncation
+            # Only take the first part if it's clearly a better representation
         
         # Remove institutional suffixes and common suffixes
         suffixes_to_remove = [
@@ -831,6 +873,73 @@ class DifferentialDiagnosisAgent:
         # Remove trailing dots, colons, and extra whitespace
         condition = condition.strip(" .:")
         
+        # Enhanced approach: Extract the most likely diagnosis from the title
+        # First, try to identify if this is a medical condition by looking for common patterns
+        import re
+        
+        # Pattern for common medical condition formats
+        # This pattern looks for capitalized words followed by medical terms like "Syndrome", "Disease", etc.
+        medical_pattern = r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Syndrome|Disease|Disorder|Condition|Infection|Cancer|Tumor|Lesion|Deficiency|Insufficiency|Failure|Syndrome))\b'
+        match = re.search(medical_pattern, condition)
+        if match:
+            return match.group(1).strip()
+        
+        # Pattern for conditions like "Heart Attack", "Kidney Stones", etc.
+        common_conditions_pattern = r'\b([A-Z][a-z]+\s+(?:Attack|Stones|Pain|Injury|Infection))\b'
+        match = re.search(common_conditions_pattern, condition)
+        if match:
+            return match.group(1).strip()
+        
+        # If no specific pattern matched, try to extract the most relevant part
+        # Split by common separators and take the most meaningful part
+        separators = [" - ", " | ", ": ", " -"]
+        for separator in separators:
+            if separator in condition:
+                parts = condition.split(separator)
+                # Take the first part that looks like a medical condition
+                for part in parts:
+                    part = part.strip()
+                    # Skip parts that are clearly not medical conditions
+                    non_medical_indicators = ["symptoms", "signs", "causes", "treatment", "diagnosis", "medical", "health", "overview", "introduction"]
+                    if not any(indicator in part.lower() for indicator in non_medical_indicators):
+                        # If part is long enough and doesn't contain non-medical words, use it
+                        if len(part) > 3:
+                            return part
+        
+        # Preserve complete medical terms by checking for common medical phrases
+        medical_phrases = [
+            "asthma and anaphylaxis",
+            "asthma and anaphylaxis in the",
+            "myocardial infarction",
+            "chronic obstructive pulmonary disease",
+            "deep vein thrombosis",
+            "attention deficit hyperactivity disorder",
+            "obsessive compulsive disorder",
+            "autism spectrum disorder",
+            "inflammatory bowel disease",
+            "chronic kidney disease",
+            "coronary artery disease",
+            "acute respiratory distress syndrome",
+            "chronic fatigue syndrome",
+            "irritable bowel syndrome",
+            "polycystic ovary syndrome",
+            "post-traumatic stress disorder",
+            "restless leg syndrome",
+            "sleep apnea syndrome",
+            "sudden infant death syndrome",
+            "toxic shock syndrome"
+        ]
+        
+        # If we have a partial match to a known medical phrase, use the full phrase
+        condition_lower = condition.lower()
+        for phrase in medical_phrases:
+            # Check if the condition is a prefix of the phrase
+            if phrase.startswith(condition_lower) and len(condition) >= 3:
+                return phrase.title()  # Use proper title case
+            # Check if the phrase is contained in the title and the condition is a part of it
+            elif phrase in title_lower and condition_lower in phrase:
+                return phrase.title()  # Use proper title case
+        
         # If the condition is too generic or empty, return the original title
         if len(condition) < 3 or condition.lower() in ["symptoms", "signs", "causes", "treatment", "diagnosis", "medical"]:
             # Try to extract from the original title by removing common words
@@ -844,7 +953,14 @@ class DifferentialDiagnosisAgent:
                 "it", "we", "they", "me", "him", "her", "us", "them"
             ]]
             if medical_words:
-                return " ".join(medical_words[:5])  # Return first 5 medical words
+                # Return first few medical words that form a coherent condition name
+                if len(medical_words) > 1:
+                    # Try to form a proper medical term
+                    combined = " ".join(medical_words[:4])  # Limit to first 4 words
+                    # Check if it looks like a medical condition
+                    if len(combined) > 3 and not any(word in combined.lower() for word in ["symptom", "sign", "cause", "treat", "diagnose", "medical", "health"]):
+                        return combined
+                return " ".join(medical_words[:7])  # Return first 7 medical words to capture longer terms
             else:
                 return title.strip()
         
@@ -1005,3 +1121,103 @@ class DifferentialDiagnosisAgent:
             ])
         
         return recommendations
+    
+    def _clean_description(self, snippet: str) -> str:
+        """Clean and format description to avoid truncation issues."""
+        if not snippet:
+            return "No additional information available"
+        
+        # Limit to reasonable length but preserve sentence boundaries
+        if len(snippet) > 400:  # Increased limit to reduce truncation
+            # Try to find a natural break point
+            truncated = snippet[:400]
+            # Look for sentence ending punctuation
+            last_punctuation = max(truncated.rfind('.'), truncated.rfind('!'), truncated.rfind('?'))
+            if last_punctuation > 350:  # Only use if it's reasonably close to the end
+                return truncated[:last_punctuation + 1].strip()
+            else:
+                # If no good punctuation break, look for word boundary
+                last_space = truncated.rfind(' ')
+                if last_space > 350:
+                    return truncated[:last_space].strip() + "..."
+                else:
+                    return truncated.strip() + "..."
+        
+        return snippet.strip()
+    
+    def _generate_dynamic_diagnoses_nlm(self, symptoms: str, vitals: dict, age: int, gender: str, medical_history: List[str], symptoms_analysis: dict) -> List[Dict[str, Any]]:
+        """Generate and rank possible diagnoses using NLM Conditions API for higher accuracy."""
+        diagnoses = []
+        
+        try:
+            # Import the NLM API function
+            from ..utils.medical_apis import search_nlm_conditions
+            
+            # Search using NLM Conditions API
+            nlm_result = search_nlm_conditions(symptoms)
+            
+            # Check if we got a valid response
+            if not isinstance(nlm_result, dict) or nlm_result.get("status") != "success":
+                logger.info("NLM Conditions API not available, falling back to Serper")
+                return []
+            
+            search_results = nlm_result.get("results", [])
+            
+            # Process each search result to create a diagnosis
+            for result in search_results:
+                # Check if result is a dict (from NLM API it should be)
+                if isinstance(result, dict):
+                    title = result.get("title", "")
+                    snippet = result.get("snippet", "")
+                    match_score = result.get("match_score", 7.0)  # NLM provides high confidence scores
+                else:
+                    # Skip non-dict results
+                    continue
+                
+                # Include results with high match scores from NLM
+                if match_score > 6.0:  # High threshold for NLM results as they're more accurate
+                    # Enhanced description handling to avoid truncation in the middle of sentences
+                    clean_description = self._clean_description(snippet)
+                    diagnoses.append({
+                        "condition": title,  # NLM provides clean condition names, use directly
+                        "match_score": round(match_score, 3),
+                        "matched_symptoms": [],  # Will be populated by frontend
+                        "matched_vitals": [],    # Will be populated by frontend
+                        "severity": self._assess_severity(title, snippet),
+                        "prevalence": min(0.95, match_score / 10.0),  # NLM results have higher prevalence
+                        "recommendations": self._get_dynamic_recommendations(title, snippet),
+                        "description": clean_description,
+                        "source": "NLM Conditions API",  # Indicate the source for transparency
+                        "link": result.get("link", "")  # Include the search result link if available
+                    })
+            
+            # Sort by match score
+            diagnoses = sorted(diagnoses, key=lambda x: x["match_score"], reverse=True)
+            
+        except Exception as e:
+            logger.error(f"Error in NLM diagnosis generation: {e}")
+            return []
+        
+        return diagnoses[:4]  # Return top 4 diagnoses
+    
+    def _generate_enhanced_diagnoses(self, symptoms: str, vitals: dict, age: int, gender: str, medical_history: List[str], symptoms_analysis: dict) -> List[Dict[str, Any]]:
+        """Generate enhanced diagnoses by combining multiple data sources."""
+        # Try NLM Conditions API first (highest accuracy)
+        nlm_diagnoses = self._generate_dynamic_diagnoses_nlm(symptoms, vitals, age, gender, medical_history, symptoms_analysis)
+        
+        # If we have NLM diagnoses, use them (lower the threshold to prevent fallback)
+        if nlm_diagnoses and len(nlm_diagnoses) > 0:
+            logger.info(f"Using NLM diagnoses with {len(nlm_diagnoses)} results")
+            return nlm_diagnoses[:4]
+        
+        # Fall back to Serper API
+        serper_diagnoses = self._generate_dynamic_diagnoses_serper(symptoms, vitals, age, gender, medical_history, symptoms_analysis)
+        
+        # If we have Serper diagnoses, use them (lower the threshold to prevent fallback)
+        if serper_diagnoses and len(serper_diagnoses) > 0:
+            logger.info(f"Using Serper diagnoses with {len(serper_diagnoses)} results")
+            return serper_diagnoses[:4]
+        
+        # Finally fall back to hardcoded conditions
+        logger.info("Falling back to hardcoded conditions")
+        return self._generate_diagnoses(symptoms, vitals, age, gender, medical_history, symptoms_analysis)

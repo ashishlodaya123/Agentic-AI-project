@@ -268,6 +268,28 @@ const DifferentialDiagnosis = ({
                   </p>
                 </div>
               )}
+              
+              {diagnosis.link && (
+                <div className="mt-4 pt-4 border-t border-neutral-border">
+                  <h4 className="font-medium text-neutral-text mb-2">
+                    Source
+                  </h4>
+                  <a 
+                    href={diagnosis.link} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 underline text-sm"
+                  >
+                    View detailed information
+                  </a>
+                </div>
+              )}
+              
+              {diagnosis.source && (
+                <div className="mt-2 text-xs text-neutral-text-secondary">
+                  Source: {diagnosis.source}
+                </div>
+              )}
             </div>
           </div>
         ))}
